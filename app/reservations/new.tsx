@@ -1,0 +1,602 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import MainLayout from '../../src/components/MainLayout';
+import { Picker } from '../../src/components/Picker';
+import { Colors } from '../../src/constants/colors';
+import { useSupabase } from '../../src/providers/SupabaseProvider';
+
+type ExperienceOption = { id: string; name: string; description: string | null };
+type AvailabilitySlot = { weekday: number; start_time: string; end_time: string; capacity: number };
+
+export default function CreateReservationPage() {
+  const { client, session } = useSupabase();
+  const { t } = useTranslation();
+  const router = useRouter();
+  const { optionId } = useLocalSearchParams<{ optionId?: string }>();
+
+  const [options, setOptions] = useState<ExperienceOption[]>([]);
+  const [selectedOption, setSelectedOption] = useState(optionId ?? '');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [partySize, setPartySize] = useState('');
+  const [contactPreference, setContactPreference] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [trackingCode, setTrackingCode] = useState<string | null>(null);
+  const [bookedName, setBookedName] = useState('');
+
+  const selectedExperience = options.find((o) => o.id === selectedOption);
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      const { data } = await client.from('service_options_view').select('id, name, description').order('name');
+      if (data) setOptions(data as ExperienceOption[]);
+    };
+    fetchOptions();
+  }, [client]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const loadProfile = async () => {
+      const { data } = await client.from('profiles').select('full_name, phone').eq('id', session.user.id).maybeSingle();
+      if (data?.full_name) setFullName(data.full_name);
+      if (data?.phone) setPhone(data.phone);
+    };
+    loadProfile();
+  }, [client, session?.user?.id]);
+
+  useEffect(() => {
+    if (!selectedOption) { setAvailability([]); return; }
+    const fetchAvailability = async () => {
+      setLoadingAvailability(true);
+      const { data } = await client
+        .from('service_option_availability')
+        .select('weekday, start_time, end_time, capacity')
+        .eq('service_option_id', selectedOption)
+        .order('weekday', { ascending: true });
+      setAvailability((data as AvailabilitySlot[]) ?? []);
+      setLoadingAvailability(false);
+    };
+    fetchAvailability();
+  }, [client, selectedOption]);
+
+  const handleSubmit = async () => {
+    if (!selectedOption) { setError(t('booking.errors.noOption')); return; }
+    if (!fullName.trim() || !phone.trim()) { setError(t('booking.errors.missingContact')); return; }
+    const parsed = partySize.trim() ? Number(partySize) : null;
+    if (parsed !== null && (Number.isNaN(parsed) || parsed <= 0)) { setError(t('booking.errors.invalidPartySize')); return; }
+
+    setSubmitting(true);
+    setError(null);
+
+    // Compose scheduled_for from date + time pickers
+    let scheduledFor: string | null = null;
+    if (selectedDate) {
+      const d = new Date(selectedDate);
+      if (selectedTime) {
+        d.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+      }
+      scheduledFor = d.toISOString();
+    }
+
+    const payload: Record<string, unknown> = {
+      service_option_id: selectedOption,
+      scheduled_for: scheduledFor,
+      notes,
+      contact_full_name: fullName.trim(),
+      contact_phone: phone.trim(),
+      contact_preference: contactPreference || null,
+    };
+    if (parsed !== null) payload.party_size = String(parsed);
+
+    const { data, error: rpcError } = await client.rpc('client_create_reservation', {
+      reservation_input: payload,
+    });
+
+    if (rpcError) {
+      console.error('[reservation] RPC error:', rpcError);
+      setError(rpcError.message ?? t('booking.errors.generic'));
+    } else if (data?.reservation_id) {
+      const { data: resData } = await client
+        .from('reservations')
+        .select('public_reference')
+        .eq('id', data.reservation_id)
+        .maybeSingle();
+      setBookedName(selectedExperience?.name ?? '');
+      setTrackingCode(resData?.public_reference ?? data.reservation_id);
+    }
+    setSubmitting(false);
+  };
+
+  // ── Not authenticated ──
+  if (!session) {
+    return (
+      <MainLayout>
+        <View style={styles.authPrompt}>
+          <View style={styles.authIcon}>
+            <Text style={styles.authIconText}>🔒</Text>
+          </View>
+          <Text style={styles.authTitle}>{t('booking.title')}</Text>
+          <Text style={styles.authDesc}>{t('booking.description')}</Text>
+          <Pressable style={styles.btnPrimary} onPress={() => router.push('/auth')}>
+            <Text style={styles.btnPrimaryText}>{t('navigation.signIn')}</Text>
+          </Pressable>
+        </View>
+      </MainLayout>
+    );
+  }
+
+  // ── Success screen with tracking code ──
+  if (trackingCode) {
+    return (
+      <MainLayout>
+        <View style={styles.successContainer}>
+          <View style={styles.successIconCircle}>
+            <Text style={styles.successIconText}>✓</Text>
+          </View>
+          <Text style={styles.successTitle}>¡Reserva confirmada!</Text>
+          <Text style={styles.successDesc}>
+            Tu solicitud para <Text style={{ fontWeight: '700', color: '#fff' }}>{bookedName}</Text> ha sido registrada. Un concierge te contactará pronto.
+          </Text>
+
+          <View style={styles.trackingCard}>
+            <Text style={styles.trackingLabel}>CÓDIGO DE SEGUIMIENTO</Text>
+            <Text style={styles.trackingCode}>{trackingCode}</Text>
+            <Text style={styles.trackingHint}>
+              Usa este código para consultar el estado de tu reserva en cualquier momento.
+            </Text>
+          </View>
+
+          <View style={styles.successActions}>
+            <Pressable style={styles.btnPrimary} onPress={() => router.push('/reservations/mine')}>
+              <Text style={styles.btnPrimaryText}>Ver mis reservas</Text>
+            </Pressable>
+            <Pressable style={styles.btnOutline} onPress={() => router.push('/reservations/status')}>
+              <Text style={styles.btnOutlineText}>Rastrear reserva</Text>
+            </Pressable>
+            <Pressable style={styles.btnGhost} onPress={() => {
+              setTrackingCode(null);
+              setSelectedOption('');
+              setSelectedDate(null);
+              setSelectedTime(null);
+              setNotes('');
+              setPartySize('');
+              setContactPreference('');
+            }}>
+              <Text style={styles.btnGhostText}>Hacer otra reserva</Text>
+            </Pressable>
+          </View>
+        </View>
+      </MainLayout>
+    );
+  }
+
+  // ── Booking form ──
+  return (
+    <MainLayout>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.headerSection}>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>RESERVA EN LÍNEA</Text>
+          </View>
+          <Text style={styles.title}>{t('booking.title')}</Text>
+          <Text style={styles.desc}>{t('booking.description')}</Text>
+        </View>
+
+        {/* Progress steps */}
+        <View style={styles.progressRow}>
+          {[
+            { num: '1', label: 'Experiencia' },
+            { num: '2', label: 'Detalles' },
+            { num: '3', label: 'Confirmar' },
+          ].map((step, idx) => (
+            <View key={step.num} style={styles.progressItem}>
+              <View style={[styles.progressDot, idx === 0 && styles.progressDotActive]}>
+                <Text style={[styles.progressNum, idx === 0 && styles.progressNumActive]}>
+                  {step.num}
+                </Text>
+              </View>
+              <Text style={styles.progressLabel}>{step.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Section 1 — Experience */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionNum}>01</Text>
+            <Text style={styles.sectionTitle}>¿Qué experiencia deseas?</Text>
+          </View>
+          <Picker
+            value={selectedOption}
+            onValueChange={setSelectedOption}
+            items={[
+              { label: t('booking.selectPlaceholder'), value: '' },
+              ...options.map((o) => ({ label: o.name, value: o.id })),
+            ]}
+          />
+          {selectedExperience?.description ? (
+            <View style={styles.experiencePreview}>
+              <Text style={styles.experiencePreviewText}>{selectedExperience.description}</Text>
+            </View>
+          ) : null}
+
+          {selectedOption ? (
+            <View style={styles.availabilityBox}>
+              <View style={styles.availHeader}>
+                <Text style={styles.availIcon}>📅</Text>
+                <Text style={styles.availabilityTitle}>{t('booking.availabilityTitle')}</Text>
+              </View>
+              {loadingAvailability ? (
+                <ActivityIndicator color={Colors.primary} size="small" />
+              ) : availability.length > 0 ? (
+                availability.map((slot) => (
+                  <View key={`${slot.weekday}-${slot.start_time}`} style={styles.availRow}>
+                    <Text style={styles.availText}>
+                      {t(`availability.weekday.${slot.weekday}` as const)} • {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
+                    </Text>
+                    <View style={styles.availCapBadge}>
+                      <Text style={styles.availCapText}>{slot.capacity} cupos</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.availabilityHint}>{t('booking.availabilityNone')}</Text>
+              )}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Section 2 — Date & Time */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionNum}>02</Text>
+            <Text style={styles.sectionTitle}>¿Cuándo te gustaría ir?</Text>
+          </View>
+
+          <View style={styles.dateTimeRow}>
+            {/* Date picker */}
+            <View style={styles.dateTimeCol}>
+              <Text style={styles.label}>📅  Fecha</Text>
+              <Pressable
+                style={styles.dateBtn}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={selectedDate ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
+                  {selectedDate
+                    ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : 'Seleccionar fecha'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Time picker */}
+            <View style={styles.dateTimeCol}>
+              <Text style={styles.label}>🕐  Hora</Text>
+              <Pressable
+                style={styles.dateBtn}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={selectedTime ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
+                  {selectedTime
+                    ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : 'Seleccionar hora'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* iOS inline pickers */}
+          {showDatePicker && (
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                value={selectedDate ?? new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={new Date()}
+                onChange={(_event, date) => {
+                  if (Platform.OS !== 'ios') setShowDatePicker(false);
+                  if (date) setSelectedDate(date);
+                }}
+                textColor="#fff"
+                themeVariant="dark"
+              />
+              {Platform.OS === 'ios' && (
+                <Pressable style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.pickerDoneBtnText}>Listo</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+          {showTimePicker && (
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                value={selectedTime ?? new Date()}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minuteInterval={15}
+                onChange={(_event, time) => {
+                  if (Platform.OS !== 'ios') setShowTimePicker(false);
+                  if (time) setSelectedTime(time);
+                }}
+                textColor="#fff"
+                themeVariant="dark"
+              />
+              {Platform.OS === 'ios' && (
+                <Pressable style={styles.pickerDoneBtn} onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerDoneBtnText}>Listo</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Section 3 — Contact info */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionNum}>03</Text>
+            <Text style={styles.sectionTitle}>Información de contacto</Text>
+          </View>
+          <View style={styles.fieldGroup}>
+            <View style={styles.inputRow}>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>{t('booking.fullNameLabel')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder={t('booking.fullNamePlaceholder') as string}
+                  placeholderTextColor={Colors.white40}
+                />
+              </View>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>{t('booking.phoneLabel')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholder={t('booking.phonePlaceholder') as string}
+                  placeholderTextColor={Colors.white40}
+                />
+              </View>
+            </View>
+            <View style={styles.inputRow}>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>{t('booking.partySizeLabel')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={partySize}
+                  onChangeText={setPartySize}
+                  keyboardType="numeric"
+                  placeholder={t('booking.partySizePlaceholder') as string}
+                  placeholderTextColor={Colors.white40}
+                />
+              </View>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>{t('booking.contactPreferenceLabel')}</Text>
+                <Picker
+                  value={contactPreference}
+                  onValueChange={setContactPreference}
+                  items={[
+                    { label: t('booking.contactPreferencePlaceholder'), value: '' },
+                    { label: t('booking.contactPreferenceOptions.whatsapp'), value: 'whatsapp' },
+                    { label: t('booking.contactPreferenceOptions.email'), value: 'email' },
+                    { label: t('booking.contactPreferenceOptions.phoneCall'), value: 'phone_call' },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Notes */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionNum}>04</Text>
+            <Text style={styles.sectionTitle}>¿Algo especial que debamos saber?</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.textarea]}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={4}
+            placeholder={t('booking.notesPlaceholder') as string}
+            placeholderTextColor={Colors.white40}
+          />
+        </View>
+
+        {/* Error */}
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>⚠  {error}</Text>
+          </View>
+        ) : null}
+
+        {/* Submit */}
+        <Pressable
+          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Text style={styles.submitBtnText}>{t('booking.submit')}</Text>
+              <Text style={styles.submitArrow}>→</Text>
+            </>
+          )}
+        </Pressable>
+
+        <Text style={styles.disclaimer}>
+          Al enviar, un concierge revisará tu solicitud y te contactará para confirmar disponibilidad y coordinar detalles.
+        </Text>
+      </View>
+    </MainLayout>
+  );
+}
+
+const styles = StyleSheet.create({
+  // Auth
+  authPrompt: { paddingHorizontal: 24, paddingVertical: 60, alignItems: 'center', gap: 16 },
+  authIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.white10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  authIconText: { fontSize: 28 },
+  authTitle: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  authDesc: { color: Colors.white60, fontSize: 15, lineHeight: 22, textAlign: 'center', maxWidth: 340 },
+
+  // Success
+  successContainer: { paddingHorizontal: 24, paddingVertical: 48, alignItems: 'center', gap: 16 },
+  successIconCircle: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    borderWidth: 2, borderColor: Colors.emerald300,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  successIconText: { color: Colors.emerald300, fontSize: 32, fontWeight: '700' },
+  successTitle: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  successDesc: { color: Colors.white70, fontSize: 15, lineHeight: 22, textAlign: 'center', maxWidth: 360 },
+  trackingCard: {
+    width: '100%', maxWidth: 400,
+    borderWidth: 1, borderColor: Colors.white15, backgroundColor: Colors.white05,
+    borderRadius: 20, padding: 24, alignItems: 'center', gap: 8, marginTop: 8,
+  },
+  trackingLabel: { color: Colors.white50, fontSize: 12, fontWeight: '600', letterSpacing: 2 },
+  trackingCode: { color: Colors.primary, fontSize: 36, fontWeight: '800', letterSpacing: 6 },
+  trackingHint: { color: Colors.white50, fontSize: 13, textAlign: 'center', lineHeight: 18, marginTop: 4 },
+  successActions: { width: '100%', maxWidth: 400, gap: 10, marginTop: 16 },
+
+  // Container
+  container: { paddingHorizontal: 20, paddingVertical: 32, maxWidth: 640, alignSelf: 'center', width: '100%' },
+
+  // Header
+  headerSection: { marginBottom: 28 },
+  headerBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(14,165,233,0.12)',
+    borderWidth: 1, borderColor: 'rgba(14,165,233,0.25)',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 16,
+  },
+  headerBadgeText: { color: Colors.primary, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  title: { color: '#fff', fontSize: 28, fontWeight: '800', marginBottom: 8, lineHeight: 36 },
+  desc: { color: Colors.white60, fontSize: 15, lineHeight: 22 },
+
+  // Progress
+  progressRow: {
+    flexDirection: 'row', justifyContent: 'center', gap: 32, marginBottom: 32,
+    paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.white10,
+  },
+  progressItem: { alignItems: 'center', gap: 6 },
+  progressDot: {
+    width: 32, height: 32, borderRadius: 16,
+    borderWidth: 1, borderColor: Colors.white20, backgroundColor: Colors.white05,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  progressDotActive: { borderColor: Colors.primary, backgroundColor: 'rgba(14,165,233,0.15)' },
+  progressNum: { color: Colors.white40, fontSize: 13, fontWeight: '700' },
+  progressNumActive: { color: Colors.primary },
+  progressLabel: { color: Colors.white50, fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
+
+  // Sections
+  section: {
+    marginBottom: 28, gap: 12,
+    borderWidth: 1, borderColor: Colors.white10, backgroundColor: Colors.white05,
+    borderRadius: 20, padding: 20,
+  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  sectionNum: { color: Colors.primary, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  sectionTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
+
+  // Fields
+  fieldGroup: { gap: 14 },
+  label: { color: Colors.white70, fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  input: {
+    borderWidth: 1, borderColor: Colors.white15, backgroundColor: 'rgba(2,44,34,0.5)',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: '#fff',
+  },
+  textarea: { minHeight: 100, textAlignVertical: 'top' },
+  inputRow: { flexDirection: 'row', gap: 12 },
+  inputCol: { flex: 1 },
+
+  // Date/time pickers
+  dateTimeRow: { flexDirection: 'row', gap: 12 },
+  dateTimeCol: { flex: 1 },
+  dateBtn: {
+    borderWidth: 1, borderColor: Colors.white15, backgroundColor: 'rgba(2,44,34,0.5)',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    alignItems: 'center',
+  },
+  dateBtnTextSelected: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  dateBtnTextPlaceholder: { color: Colors.white40, fontSize: 14 },
+  pickerContainer: {
+    backgroundColor: 'rgba(2,44,34,0.85)',
+    borderWidth: 1, borderColor: Colors.white15,
+    borderRadius: 16, overflow: 'hidden', marginTop: 4,
+  },
+  pickerDoneBtn: {
+    alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10,
+  },
+  pickerDoneBtnText: { color: Colors.primary, fontSize: 15, fontWeight: '700' },
+
+  // Experience preview
+  experiencePreview: { backgroundColor: Colors.white05, borderRadius: 12, padding: 14, borderLeftWidth: 3, borderLeftColor: Colors.primary },
+  experiencePreviewText: { color: Colors.white70, fontSize: 14, lineHeight: 20 },
+
+  // Availability
+  availabilityBox: { borderWidth: 1, borderColor: Colors.white10, backgroundColor: Colors.white05, borderRadius: 16, padding: 16, gap: 10 },
+  availHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  availIcon: { fontSize: 16 },
+  availabilityTitle: { color: Colors.white80, fontSize: 14, fontWeight: '600' },
+  availabilityHint: { color: Colors.white50, fontSize: 13 },
+  availRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  availText: { color: Colors.white70, fontSize: 13 },
+  availCapBadge: { backgroundColor: Colors.white10, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  availCapText: { color: Colors.white60, fontSize: 11, fontWeight: '600' },
+
+  // Error
+  errorBox: {
+    backgroundColor: 'rgba(253,164,175,0.08)', borderWidth: 1, borderColor: 'rgba(253,164,175,0.2)',
+    borderRadius: 14, padding: 14, marginBottom: 16,
+  },
+  errorText: { color: Colors.rose300, fontSize: 14 },
+
+  // Submit
+  submitBtn: {
+    backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: Colors.primary, shadowOpacity: 0.3, shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12, elevation: 6,
+  },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 1.5, textTransform: 'uppercase' },
+  submitArrow: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  disclaimer: { color: Colors.white40, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 16 },
+
+  // Buttons
+  btnPrimary: { backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  btnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 1.5, textTransform: 'uppercase' },
+  btnOutline: { borderWidth: 1, borderColor: Colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  btnOutlineText: { color: Colors.primary, fontWeight: '700', fontSize: 14, letterSpacing: 1.5, textTransform: 'uppercase' },
+  btnGhost: { paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  btnGhostText: { color: Colors.white60, fontWeight: '600', fontSize: 14 },
+});
