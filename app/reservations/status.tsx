@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import MainLayout from '../../src/components/MainLayout';
@@ -20,7 +21,8 @@ type ReservationSearchResult = {
 
 export default function ReservationStatusPage() {
   const { t } = useTranslation();
-  const [reference, setReference] = useState('');
+  const { ref } = useLocalSearchParams<{ ref?: string }>();
+  const [reference, setReference] = useState((ref ?? '').toUpperCase());
   const [result, setResult] = useState<ReservationSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

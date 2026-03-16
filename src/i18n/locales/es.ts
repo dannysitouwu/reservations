@@ -16,25 +16,26 @@ const translation = {
     }
   },
   hero: {
-    badge: 'Vive Costa Rica',
-    titleLead: 'Reserva aventuras auténticas en',
-    titleHighlight: 'Costa Rica',
+    badge: 'Eventos y experiencias premium',
+    titleLead: 'Reserva experiencias memorables con',
+    titleHighlight: 'ReservaPro',
     description:
-      'Explora playas de arena blanca, canopy entre volcanes y encuentros con perezosos guiados por expertos locales.',
+      'Organiza espacios, catering y sesiones de bienestar con confirmación rápida y seguimiento en tiempo real.',
     primaryCta: 'Planear experiencia',
     secondaryCta: 'Ver catálogo',
     stats: [
-      { value: '320+', label: 'Experiencias tropicales seleccionadas' },
-      { value: '4.9/5', label: 'Calificación promedio de viajeros' }
+      { value: '120+', label: 'Experiencias activas en catálogo' },
+      { value: '< 24h', label: 'Tiempo promedio de primera respuesta' }
     ],
+    averageFromReviews: 'Promedio basado en {{count}} evaluaciones',
     card: {
       statusTitle: 'Estado actual',
-      itinerary: 'Itinerario Caribe',
-      schedule: '12 julio 2026 • 2 personas',
+      itinerary: 'Solicitud premium',
+      schedule: '17 marzo 2026 • 12 personas',
       teamTitle: 'Equipo asignado',
-      team: ['Guía naturalista', 'Conductor privado', 'Chef local'],
+      team: ['Coordinador de evento', 'Proveedor principal', 'Soporte en sitio'],
       testimonial:
-        '“Disfrutamos tortugas anidando al amanecer y un café gourmet con vista al volcán Arenal.”'
+        '“Confirmaron mi reserva en horas y recibí toda la información clara en un solo lugar.”'
     }
   },
   highlights: {
@@ -116,7 +117,7 @@ const translation = {
   },
   footer: {
     description:
-      'Inspirando viajes responsables por Costa Rica: playas caribeñas, volcanes activos y selvas llenas de vida.',
+      'Plataforma de reservas para experiencias, espacios y servicios premium con seguimiento en tiempo real.',
     links: {
       experiences: 'Experiencias',
       plan: 'Planificar viaje',
@@ -268,6 +269,13 @@ const translation = {
     notesEmpty: 'No se registraron notas.',
     unscheduled: 'Por confirmar',
     unnamedExperience: 'Experiencia en Costa Rica'
+  },
+  contact: {
+    title: 'Habla con un experto',
+    description: 'Contáctanos por el canal que prefieras y te ayudamos a cerrar tu reserva.',
+    whatsappHint: 'Respuesta rápida para coordinación inmediata.',
+    emailHint: 'Ideal para enviar requisitos detallados o cotizaciones.',
+    phoneHint: 'Atención directa para soporte personalizado.'
   }
 };
 

@@ -25,7 +25,7 @@ export function CTASection() {
               <Link to="/reservations/new" className="btn btn-primary">
                 {t('cta.primary')}
               </Link>
-              <Link to="/auth" className="btn btn-ghost border-white/30">
+              <Link to="/contact" className="btn btn-ghost border-white/30">
                 {t('cta.secondary')}
               </Link>
             </div>

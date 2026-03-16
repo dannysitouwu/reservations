@@ -52,14 +52,14 @@ export function ReservationsPage() {
     <section className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-slate-900">Reservas</h1>
-        <p className="text-sm text-slate-500">Gestiona reservas entrantes, asigna concierge y monitorea estados críticos.</p>
+        <p className="text-sm text-slate-500">Gestiona reservas entrantes, asigna empleado y monitorea estados críticos.</p>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <CardTitle>Filtros</CardTitle>
-            <p className="text-sm text-slate-500">Filtra por estado o busca por código, cliente o concierge.</p>
+            <p className="text-sm text-slate-500">Filtra por estado o busca por código, cliente o empleado.</p>
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div>

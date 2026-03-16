@@ -149,7 +149,7 @@ export function ReservationDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-slate-600">
             <div>
-              <p className="text-xs uppercase text-slate-500">Concierge líder</p>
+              <p className="text-xs uppercase text-slate-500">Empleado líder</p>
               <p className="mt-2 font-semibold text-slate-900">{reservation.assigned_worker_name ?? 'Sin asignar'}</p>
             </div>
             <div>

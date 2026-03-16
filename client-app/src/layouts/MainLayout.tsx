@@ -1,14 +1,15 @@
-import { PropsWithChildren, useMemo } from 'react';
+import { PropsWithChildren, useMemo, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Container } from '../components/ui/Container';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 export function MainLayout({ children }: PropsWithChildren) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navItems = useMemo(
     () => t('navigation.items', { returnObjects: true }) as Array<{ to: string; label: string }>,
-    [t]
+    [t, i18n.language]
   );
 
   return (
@@ -45,10 +46,48 @@ export function MainLayout({ children }: PropsWithChildren) {
               {t('navigation.signIn')}
             </Link>
           </div>
+
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white lg:hidden"
+            aria-label={t('navigation.mobileMenu') as string}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+          >
+            <span className="text-lg">{mobileMenuOpen ? 'x' : '≡'}</span>
+          </button>
         </Container>
-        <div className="px-6 pb-4 lg:hidden">
-          <LanguageSwitcher />
-        </div>
+        {mobileMenuOpen ? (
+          <div className="border-t border-white/10 bg-brand-background/95 px-6 pb-5 pt-4 lg:hidden">
+            <div className="mb-4">
+              <LanguageSwitcher />
+            </div>
+            <nav className="flex flex-col gap-3 text-sm font-medium text-white/85">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `rounded-xl border px-3 py-2 transition ${
+                      isActive
+                        ? 'border-brand-secondary/70 bg-white/10 text-white'
+                        : 'border-white/10 text-white/80 hover:border-white/20 hover:bg-white/10 hover:text-white'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+              <Link
+                to="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-1 rounded-xl border border-white/20 px-3 py-2 text-white/90 transition hover:bg-white/10"
+              >
+                {t('navigation.signIn')}
+              </Link>
+            </nav>
+          </div>
+        ) : null}
       </header>
       <main className="flex-1">{children}</main>
       <footer className="mt-16 border-t border-white/10 bg-brand-background/70 py-12 text-sm text-white/60">
@@ -67,7 +106,7 @@ export function MainLayout({ children }: PropsWithChildren) {
             <Link to="/reservations/status" className="hover:text-white">
               {t('footer.links.status')}
             </Link>
-            <Link to="/auth" className="hover:text-white">
+            <Link to="/contact" className="hover:text-white">
               {t('footer.links.concierge')}
             </Link>
           </div>

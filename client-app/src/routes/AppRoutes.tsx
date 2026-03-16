@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { AuthPage } from '../pages/AuthPage';
+import { ContactPage } from '../pages/ContactPage';
 import { CreateReservationPage } from '../pages/CreateReservationPage';
 import { HomePage } from '../pages/HomePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -14,6 +15,7 @@ export function AppRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/reservations/new" element={<CreateReservationPage />} />
         <Route path="/reservations/status" element={<ReservationStatusPage />} />
         <Route path="/reservations/options" element={<ReservationOptionsPage />} />

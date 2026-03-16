@@ -1,7 +1,7 @@
 import { usePathname, useRouter } from 'expo-router';
-import React, { PropsWithChildren, useState } from 'react';
+import React, { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
 import { useSupabase } from '../providers/SupabaseProvider';
@@ -12,11 +12,41 @@ export function MainLayout({ children }: PropsWithChildren) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
+  const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
+
   const { session, client } = useSupabase();
 
   const navItems = (t('navigation.items', { returnObjects: true }) || []) as NavItem[];
+
+  useEffect(() => {
+    const fetchDisplayName = async () => {
+      if (!session?.user?.id) {
+        setProfileDisplayName(null);
+        return;
+      }
+      const { data } = await client
+        .from('profiles')
+        .select('full_name, metadata')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const metadata = (data?.metadata as Record<string, unknown> | null) ?? {};
+      const username = typeof metadata.username === 'string' ? metadata.username.trim() : '';
+      const fullName = typeof data?.full_name === 'string' ? data.full_name.trim() : '';
+      setProfileDisplayName(username || fullName || null);
+    };
+    void fetchDisplayName();
+  }, [client, session?.user?.id]);
+
+  const authPillLabel = useMemo(() => {
+    if (!session) return t('navigation.signIn');
+    if (profileDisplayName) return profileDisplayName;
+    return session.user?.email?.split('@')[0] ?? t('navigation.signIn');
+  }, [profileDisplayName, session, t]);
 
   const mappedNavItems = navItems.map((item) => ({
     ...item,
@@ -38,7 +68,11 @@ export function MainLayout({ children }: PropsWithChildren) {
   };
 
   const toggleLang = () => {
-    i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es');
+    const nextLang = i18n.language.startsWith('es') ? 'en' : 'es';
+    i18n.changeLanguage(nextLang);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.setItem('reservapro_lang', nextLang);
+    }
   };
 
   return (
@@ -54,7 +88,7 @@ export function MainLayout({ children }: PropsWithChildren) {
           </Pressable>
 
           {/* Desktop nav */}
-          {Platform.OS === 'web' ? (
+          {isDesktopWeb ? (
             <View style={styles.desktopNav}>
               {mappedNavItems.map((item) => (
                 <Pressable key={item.to} onPress={() => navigate(item.to)}>
@@ -68,15 +102,15 @@ export function MainLayout({ children }: PropsWithChildren) {
 
           <View style={styles.headerRight}>
             <Pressable style={styles.langBtn} onPress={toggleLang}>
-              <Text style={styles.langText}>{i18n.language === 'es' ? 'ES' : 'EN'}</Text>
+              <Text style={styles.langText}>{i18n.language.startsWith('es') ? 'ES' : 'EN'}</Text>
               <Text style={styles.langCaret}>▾</Text>
             </Pressable>
 
-            {Platform.OS === 'web' ? (
+            {isDesktopWeb ? (
               session ? (
                 <Pressable style={styles.signInBtn} onPress={() => navigate('/auth')}>
                   <Text style={styles.signInText} numberOfLines={1}>
-                    {session.user?.email?.split('@')[0] ?? t('navigation.signIn')}
+                    {authPillLabel}
                   </Text>
                 </Pressable>
               ) : (
@@ -91,10 +125,13 @@ export function MainLayout({ children }: PropsWithChildren) {
             )}
           </View>
         </View>
+      </View>
 
-        {/* Mobile menu */}
-        {menuOpen && Platform.OS !== 'web' ? (
-          <View style={styles.mobileMenu}>
+      {/* Mobile menu */}
+      {menuOpen && !isDesktopWeb ? (
+        <View style={[styles.mobileMenuLayer, { top: insets.top + 74 }]}>
+          <Pressable style={styles.mobileBackdrop} onPress={() => setMenuOpen(false)} />
+          <View style={styles.mobileMenuCard}>
             {mappedNavItems.map((item) => (
               <Pressable key={item.to} style={styles.mobileMenuItem} onPress={() => navigate(item.to)}>
                 <Text style={[styles.mobileMenuText, isActive(item.to) && styles.mobileMenuActive]}>
@@ -103,13 +140,11 @@ export function MainLayout({ children }: PropsWithChildren) {
               </Pressable>
             ))}
             <Pressable style={styles.mobileMenuItem} onPress={() => navigate('/auth')}>
-              <Text style={styles.mobileMenuText}>
-                {session ? session.user?.email?.split('@')[0] : t('navigation.signIn')}
-              </Text>
+              <Text style={styles.mobileMenuText}>{authPillLabel}</Text>
             </Pressable>
           </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {/* Content */}
       <ScrollView
@@ -134,7 +169,7 @@ export function MainLayout({ children }: PropsWithChildren) {
             <Pressable onPress={() => navigate('/reservations/status')}>
               <Text style={styles.footerLink}>{t('footer.links.status')}</Text>
             </Pressable>
-            <Pressable onPress={() => navigate('/auth')}>
+            <Pressable onPress={() => navigate('/contact')}>
               <Text style={styles.footerLink}>{t('footer.links.concierge')}</Text>
             </Pressable>
           </View>
@@ -146,7 +181,7 @@ export function MainLayout({ children }: PropsWithChildren) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, maxWidth: '100%', overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: Colors.background, maxWidth: '100%' },
   header: { borderBottomWidth: 1, borderBottomColor: Colors.white10 },
   headerInner: {
     flexDirection: 'row',
@@ -190,15 +225,47 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   signInText: { color: Colors.white80, fontSize: 14, fontWeight: '600' },
-  hamburger: { padding: 8 },
-  hamburgerText: { color: '#fff', fontSize: 22 },
-  mobileMenu: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.white10,
+  hamburger: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.white20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(2,44,34,0.75)',
   },
-  mobileMenuItem: { paddingVertical: 10 },
+  hamburgerText: { color: '#fff', fontSize: 22 },
+  mobileMenuLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99,
+    height: '100%',
+    justifyContent: 'flex-start',
+  },
+  mobileBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(2,6,23,0.42)',
+  },
+  mobileMenuCard: {
+    marginHorizontal: 14,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Colors.white20,
+    backgroundColor: 'rgba(2,44,34,0.96)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 16 },
+    shadowRadius: 30,
+    elevation: 16,
+  },
+  mobileMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
   mobileMenuText: { color: Colors.white80, fontSize: 16, fontWeight: '500' },
   mobileMenuActive: { color: '#fff', fontWeight: '700' },
   content: { flex: 1, backgroundColor: Colors.background },

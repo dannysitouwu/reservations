@@ -8,6 +8,7 @@ const translation = {
       { to: '/reservations/mine', label: 'My reservations' }
     ],
     signIn: 'Sign in',
+    mobileMenu: 'Open menu',
     concierge: 'Concierge access',
     language: {
       label: 'Language',
@@ -16,47 +17,48 @@ const translation = {
     }
   },
   hero: {
-    badge: 'Experience Costa Rica',
-    titleLead: 'Reserve authentic adventures in',
-    titleHighlight: 'Costa Rica',
+    badge: 'Premium reservations platform',
+    titleLead: 'Book memorable experiences with',
+    titleHighlight: 'ReservaPro',
     description:
-      'Discover white-sand beaches, canopy tours over volcanoes, and sloth encounters led by local experts.',
+      'Plan venues, catering, and wellness sessions with fast confirmation and real-time tracking.',
     primaryCta: 'Plan experience',
     secondaryCta: 'View catalog',
     stats: [
-      { value: '320+', label: 'Curated tropical experiences' },
-      { value: '4.9/5', label: 'Average traveler rating' }
+      { value: '120+', label: 'Active catalog experiences' },
+      { value: '< 24h', label: 'Average first response time' }
     ],
+    averageFromReviews: 'Average based on {{count}} reviews',
     card: {
       statusTitle: 'Current status',
-      itinerary: 'Caribbean itinerary',
-      schedule: '12 July 2026 • 2 guests',
+      itinerary: 'Premium request',
+      schedule: '17 March 2026 • 12 guests',
       teamTitle: 'Assigned team',
-      team: ['Naturalist guide', 'Private driver', 'Local chef'],
+      team: ['Event coordinator', 'Main vendor', 'On-site support'],
       testimonial:
-        '“We watched turtles hatch at dawn and enjoyed gourmet coffee facing the Arenal Volcano.”'
+        '“My reservation was confirmed within hours and all details were clear in one place.”'
     }
   },
   highlights: {
     eyebrow: 'Why travel with us',
-    title: 'A window into Costa Rican essence',
+    title: 'A platform focused on outcomes',
     description:
-      'We craft responsible itineraries that connect Pacific beaches, cloud forests, and villages filled with pura vida.',
+      'We centralize the full reservation workflow so your booking experience stays simple, professional, and traceable.',
     items: [
       {
-        icon: '🌊',
-        title: 'Network of local experts',
-        description: 'Certified guides who share secrets from Cahuita, Monteverde, and the Talamanca highlands.'
+        icon: '🧭',
+        title: 'Expert coordination',
+        description: 'A human concierge reviews each request and reaches you through your preferred channel.'
       },
       {
-        icon: '🦥',
-        title: 'Sustainable encounters',
-        description: 'Observe sloths and macaws in conservation centers that reinvest in nearby communities.'
+        icon: '📲',
+        title: 'Code-based tracking',
+        description: 'Every reservation gets a unique code so you can check status and details anytime.'
       },
       {
-        icon: '🌋',
-        title: 'Adventure and wellness',
-        description: 'Zip-line above volcanoes, raft the Pacuare River, and relax in hot springs at La Fortuna.'
+        icon: '✅',
+        title: 'Reliable operation',
+        description: 'Availability, contact data, and notes stay recorded to avoid losing critical information.'
       }
     ]
   },
@@ -116,7 +118,7 @@ const translation = {
   },
   footer: {
     description:
-      'Inspiring responsible travel across Costa Rica: Caribbean shores, active volcanoes, and wildlife-rich rainforests.',
+      'Reservation platform for premium experiences, spaces, and services with real-time tracking.',
     links: {
       experiences: 'Experiences',
       plan: 'Plan trip',
@@ -130,8 +132,10 @@ const translation = {
     description:
       'Fill in the details to connect with a certified concierge who will confirm availability and coordinate logistics.',
     selectLabel: 'Select an experience',
-    selectPlaceholder: 'Choose a Costa Rican experience',
+    selectPlaceholder: 'Choose an experience',
     datetimeLabel: 'Preferred date & time',
+    dateLabel: 'Date',
+    timeLabel: 'Time',
     fullNameLabel: 'Full name',
     fullNamePlaceholder: 'Who should we coordinate with?',
     phoneLabel: 'Phone number',
@@ -140,6 +144,7 @@ const translation = {
     partySizePlaceholder: 'e.g. 4',
     contactPreferenceLabel: 'Preferred contact method',
     contactPreferencePlaceholder: 'Select how we should reach you',
+    useSavedProfile: 'Use saved account details',
     contactPreferenceOptions: {
       whatsapp: 'WhatsApp',
       email: 'Email',
@@ -149,6 +154,8 @@ const translation = {
     notesLabel: 'Special details',
     notesPlaceholder: 'Share ages, interests, or dietary requirements',
     submit: 'Submit reservation',
+    downloadPdf: 'Download voucher (PDF)',
+    viewMine: 'Go to my reservations',
     submitting: 'Submitting…',
     success: 'Reservation sent! Your code is {{code}}',
     errors: {
@@ -183,12 +190,13 @@ const translation = {
     rejected: 'Rejected'
   },
   options: {
-    eyebrow: 'Costa Caribe to Pacific',
-    title: 'Costa Rican experience collection',
+    eyebrow: 'Active catalog',
+    title: 'Experience and services collection',
     description:
-      'Explore tailored adventures from the Caribbean to the Pacific. Every option includes bilingual guides and safe transport.',
+      'Explore configurable options for events, wellness, and private experiences. Book in minutes.',
     curatedTag: 'Curated',
     badges: ['Adventure', 'Nature', 'Wellness'],
+    bookNow: 'Book now',
     loading: 'Loading tropical experiences…'
   },
   statusPage: {
@@ -234,6 +242,13 @@ const translation = {
     haveAccount: 'Already have an account?',
     createAccount: 'Create account',
     signInHere: 'Sign in here',
+    profileFirstName: 'First name',
+    profileLastName: 'Last name',
+    profilePhone: 'Phone',
+    profileUsername: 'Username (visual)',
+    saveProfile: 'Save profile',
+    savingProfile: 'Saving profile…',
+    profileSaved: 'Profile updated successfully.',
     passwordMismatch: 'Passwords do not match.',
     checkEmail: 'Check {{email}} to confirm your account before signing in.'
   },
@@ -257,6 +272,14 @@ const translation = {
     signInDescription: 'Sign in to view upcoming experiences and manage your requests.',
     signInCta: 'Sign in',
     reference: 'Reference • {{code}}',
+    copyCode: 'Copy code',
+    downloadPdf: 'Download PDF',
+    feedbackTitle: 'Rate your experience',
+    feedbackPlaceholder: 'Share your comment (optional)',
+    feedbackScore: '{{score}} stars',
+    saveFeedback: 'Save feedback',
+    savingFeedback: 'Saving…',
+    feedbackError: 'We could not save your feedback.',
     scheduledFor: 'Scheduled for',
     createdAt: 'Created on',
     partySize: 'Group size',
@@ -268,6 +291,13 @@ const translation = {
     notesEmpty: 'No notes were provided.',
     unscheduled: 'To be confirmed',
     unnamedExperience: 'Costa Rica experience'
+  },
+  contact: {
+    title: 'Talk to an expert',
+    description: 'Reach out through your preferred channel and we will help you close your reservation.',
+    whatsappHint: 'Fast response for immediate coordination.',
+    emailHint: 'Best for detailed requirements and quotes.',
+    phoneHint: 'Direct attention for personalized support.'
   }
 };
 

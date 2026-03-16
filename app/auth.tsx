@@ -1,10 +1,36 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Picker } from '../src/components/Picker';
 import MainLayout from '../src/components/MainLayout';
 import { Colors } from '../src/constants/colors';
 import { useSupabase } from '../src/providers/SupabaseProvider';
+
+const COUNTRY_CODES = [
+  { label: 'Costa Rica (+506)', value: '+506' },
+  { label: 'Panama (+507)', value: '+507' },
+  { label: 'Nicaragua (+505)', value: '+505' },
+  { label: 'Guatemala (+502)', value: '+502' },
+  { label: 'El Salvador (+503)', value: '+503' },
+  { label: 'Honduras (+504)', value: '+504' },
+  { label: 'USA / Canada (+1)', value: '+1' },
+];
+
+function formatLocalPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+  return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+}
+
+function parseStoredPhone(value: string | null): { countryCode: string; local: string } {
+  if (!value) return { countryCode: '+506', local: '' };
+  const clean = value.trim();
+  const match = clean.match(/^(\+\d{1,3})\s*(.*)$/);
+  const countryCode = match?.[1] ?? '+506';
+  const local = formatLocalPhoneInput(match?.[2] ?? clean.replace(/^\+\d{1,3}/, ''));
+  return { countryCode, local };
+}
 
 export default function AuthPage() {
   const router = useRouter();
@@ -13,11 +39,40 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+506');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const isSignIn = mode === 'signIn';
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!session?.user?.id) return;
+      const { data } = await client
+        .from('profiles')
+        .select('full_name, phone, metadata')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (!data) return;
+      const full = data.full_name ?? '';
+      const [first = '', ...rest] = full.split(' ');
+      setFirstName(first);
+      setLastName(rest.join(' '));
+      const parsedPhone = parseStoredPhone(data.phone ?? '');
+      setPhoneCountryCode(parsedPhone.countryCode);
+      setPhone(parsedPhone.local);
+      const metadata = (data.metadata as Record<string, unknown> | null) ?? {};
+      setUsername(typeof metadata.username === 'string' ? metadata.username : '');
+    };
+    void loadProfile();
+  }, [client, session?.user?.id]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -25,6 +80,12 @@ export default function AuthPage() {
 
     if (!isSignIn && password !== confirmPassword) {
       setError(t('auth.passwordMismatch'));
+      return;
+    }
+
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (!isSignIn && phone && phoneDigits.length !== 8) {
+      setError('Ingresa un teléfono válido de 8 dígitos.');
       return;
     }
 
@@ -42,7 +103,19 @@ export default function AuthPage() {
       if (signUpError) {
         setError(signUpError.message);
       } else if (data?.session) {
-        // Auto signed-in (email confirmation disabled)
+        const composedName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ').trim() || null;
+        const normalizedPhone = phoneDigits ? `${phoneCountryCode} ${formatLocalPhoneInput(phone)}` : null;
+        await client
+          .from('profiles')
+          .update({
+            full_name: composedName,
+            phone: normalizedPhone,
+            metadata: {
+              username: username.trim() || null,
+              last_name: lastName.trim() || null,
+            },
+          })
+          .eq('id', data.session.user.id);
         setMessage(t('auth.signedIn'));
       } else if (data?.user && !data.session) {
         // Fallback: sign in manually after signup
@@ -70,6 +143,42 @@ export default function AuthPage() {
     await client.auth.signOut();
   };
 
+  const handleSaveProfile = async () => {
+    if (!session?.user?.id) return;
+    setSavingProfile(true);
+    setError(null);
+    setMessage(null);
+
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phone && phoneDigits.length !== 8) {
+      setError('Ingresa un teléfono válido de 8 dígitos.');
+      setSavingProfile(false);
+      return;
+    }
+
+    const composedName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ').trim() || null;
+    const normalizedPhone = phoneDigits ? `${phoneCountryCode} ${formatLocalPhoneInput(phone)}` : null;
+    const { error: updateError } = await client
+      .from('profiles')
+      .update({
+        full_name: composedName,
+        phone: normalizedPhone,
+        metadata: {
+          username: username.trim() || null,
+          last_name: lastName.trim() || null,
+        },
+      })
+      .eq('id', session.user.id);
+
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setMessage('Perfil actualizado correctamente.');
+    }
+
+    setSavingProfile(false);
+  };
+
   return (
     <MainLayout>
       <View style={styles.container}>
@@ -79,9 +188,53 @@ export default function AuthPage() {
         <View style={styles.formCard}>
           {session ? (
             <View style={styles.signedInContainer}>
-              <Text style={styles.signedInText}>
-                {t('auth.signedAs', { email: session.user?.email })}
-              </Text>
+              <View style={styles.accountHeaderCard}>
+                <View style={styles.accountAvatar}>
+                  <Text style={styles.accountAvatarText}>
+                    {(username || firstName || 'RP').slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accountName}>{[firstName, lastName].filter(Boolean).join(' ') || username || 'Perfil'}</Text>
+                  <Text style={styles.signedInText}>{t('auth.signedAs', { email: session.user?.email })}</Text>
+                </View>
+              </View>
+
+              <View style={styles.profileGrid}>
+                <View style={styles.profileField}>
+                  <Text style={styles.label}>Nombre</Text>
+                  <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholderTextColor={Colors.white40} />
+                </View>
+                <View style={styles.profileField}>
+                  <Text style={styles.label}>Apellidos</Text>
+                  <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor={Colors.white40} />
+                </View>
+                <View style={styles.profileField}>
+                  <Text style={styles.label}>Teléfono</Text>
+                  <View style={styles.phoneRow}>
+                    <View style={styles.phoneCodeCol}>
+                      <Picker value={phoneCountryCode} onValueChange={setPhoneCountryCode} items={COUNTRY_CODES} />
+                    </View>
+                    <View style={styles.phoneLocalCol}>
+                      <TextInput
+                        style={styles.input}
+                        value={phone}
+                        onChangeText={(v) => setPhone(formatLocalPhoneInput(v))}
+                        placeholder="1234-5678"
+                        placeholderTextColor={Colors.white40}
+                        keyboardType="phone-pad"
+                      />
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.profileField}>
+                  <Text style={styles.label}>Username</Text>
+                  <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor={Colors.white40} autoCapitalize="none" />
+                </View>
+              </View>
+              <Pressable style={[styles.btnPrimary, savingProfile && styles.btnDisabled]} onPress={handleSaveProfile} disabled={savingProfile}>
+                {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnPrimaryText}>Guardar perfil</Text>}
+              </Pressable>
               <Pressable style={styles.btnGhost} onPress={handleSignOut}>
                 <Text style={styles.btnGhostText}>{t('auth.signOut')}</Text>
               </Pressable>
@@ -110,15 +263,47 @@ export default function AuthPage() {
                 />
               </View>
               {!isSignIn ? (
-                <View>
-                  <Text style={styles.label}>{t('auth.confirmPassword')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    secureTextEntry
-                    placeholderTextColor={Colors.white40}
-                  />
+                <View style={styles.profileGrid}>
+                  <View style={styles.profileField}>
+                    <Text style={styles.label}>{t('auth.confirmPassword')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                      placeholderTextColor={Colors.white40}
+                    />
+                  </View>
+                  <View style={styles.profileField}>
+                    <Text style={styles.label}>Nombre</Text>
+                    <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholderTextColor={Colors.white40} />
+                  </View>
+                  <View style={styles.profileField}>
+                    <Text style={styles.label}>Apellidos</Text>
+                    <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor={Colors.white40} />
+                  </View>
+                  <View style={styles.profileField}>
+                    <Text style={styles.label}>Teléfono</Text>
+                    <View style={styles.phoneRow}>
+                      <View style={styles.phoneCodeCol}>
+                        <Picker value={phoneCountryCode} onValueChange={setPhoneCountryCode} items={COUNTRY_CODES} />
+                      </View>
+                      <View style={styles.phoneLocalCol}>
+                        <TextInput
+                          style={styles.input}
+                          value={phone}
+                          onChangeText={(v) => setPhone(formatLocalPhoneInput(v))}
+                          placeholder="1234-5678"
+                          placeholderTextColor={Colors.white40}
+                          keyboardType="phone-pad"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.profileField}>
+                    <Text style={styles.label}>Username</Text>
+                    <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor={Colors.white40} autoCapitalize="none" />
+                  </View>
                 </View>
               ) : null}
               <Pressable
@@ -160,11 +345,33 @@ const styles = StyleSheet.create({
   formCard: {
     borderWidth: 1,
     borderColor: Colors.white10,
-    backgroundColor: Colors.white10,
+    backgroundColor: 'rgba(9,66,55,0.42)',
     borderRadius: 24,
     padding: 24,
   },
   signedInContainer: { gap: 16 },
+  accountHeaderCard: {
+    borderWidth: 1,
+    borderColor: Colors.white15,
+    backgroundColor: 'rgba(2,44,34,0.55)',
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  accountAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(14,165,233,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,211,252,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountAvatarText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  accountName: { color: '#fff', fontSize: 17, fontWeight: '700' },
   signedInText: { color: Colors.white70, fontSize: 14 },
   form: { gap: 18 },
   label: { color: Colors.white80, fontSize: 14, fontWeight: '600', marginBottom: 6 },
@@ -199,4 +406,9 @@ const styles = StyleSheet.create({
   toggleLink: { color: Colors.accent, fontSize: 14, fontWeight: '600' },
   error: { color: Colors.rose300, fontSize: 13, marginTop: 12 },
   success: { color: Colors.emerald300, fontSize: 13, marginTop: 12 },
+  profileGrid: { gap: 12 },
+  profileField: { gap: 6 },
+  phoneRow: { flexDirection: 'row', gap: 10 },
+  phoneCodeCol: { flex: 1 },
+  phoneLocalCol: { flex: 1.2 },
 });

@@ -1,13 +1,39 @@
 import { motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Container } from '../../components/ui/Container';
 import { GradientText } from '../../components/ui/GradientText';
+import { supabase } from '../../lib/supabaseClient';
 
 export function Hero() {
   const { t } = useTranslation();
-  const stats = t('hero.stats', { returnObjects: true }) as Array<{ value: string; label: string }>;
+  const [reviewSummary, setReviewSummary] = useState<{ total_reviews: number; average_rating: number } | null>(null);
+  const stats = useMemo(() => {
+    const base = t('hero.stats', { returnObjects: true }) as Array<{ value: string; label: string }>;
+    if (!reviewSummary || reviewSummary.total_reviews <= 0) return base;
+    return [
+      base[0],
+      {
+        value: `${Number(reviewSummary.average_rating).toFixed(1)}/5`,
+        label: t('hero.averageFromReviews', { count: reviewSummary.total_reviews }) as string
+      }
+    ];
+  }, [reviewSummary, t]);
   const team = t('hero.card.team', { returnObjects: true }) as string[];
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      const { data } = await supabase.from('feedback_summary_view').select('*').limit(1).maybeSingle();
+      if (data) {
+        setReviewSummary({
+          total_reviews: Number(data.total_reviews ?? 0),
+          average_rating: Number(data.average_rating ?? 0)
+        });
+      }
+    };
+    void fetchSummary();
+  }, []);
 
   return (
     <section className="relative overflow-hidden pt-24 pb-32">

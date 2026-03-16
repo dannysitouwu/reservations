@@ -10,9 +10,13 @@ const LANG_OPTIONS = [
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const currentLang = i18n.language.startsWith('es') ? 'es' : 'en';
 
   const handleSelect = (code: string) => {
     i18n.changeLanguage(code);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('reservapro_lang', code);
+    }
     setOpen(false);
   };
 
@@ -24,7 +28,7 @@ export function LanguageSwitcher() {
         className="flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-white/80 transition hover:-translate-y-0.5 hover:text-white"
         title={t('languageSwitcher.tooltip')}
       >
-        {i18n.language === 'es' ? 'ES' : 'EN'}
+        {currentLang === 'es' ? 'ES' : 'EN'}
         <span aria-hidden className="text-white/50">▾</span>
       </button>
       {open ? (
@@ -36,11 +40,11 @@ export function LanguageSwitcher() {
                 onClick={() => handleSelect(option.code)}
                 className={clsx(
                   'flex w-full items-center justify-between rounded-lg px-3 py-2 transition hover:bg-white/10',
-                  i18n.language === option.code ? 'text-brand-accent' : 'text-white/80'
+                  currentLang === option.code ? 'text-brand-accent' : 'text-white/80'
                 )}
               >
                 <span>{option.label}</span>
-                {i18n.language === option.code ? <span aria-hidden>•</span> : null}
+                {currentLang === option.code ? <span aria-hidden>•</span> : null}
               </button>
             </li>
           ))}

@@ -12,8 +12,11 @@ i18n.use(initReactI18next).init({
       translation: en
     }
   },
-  lng: 'es',
+  lng: typeof window !== 'undefined' ? window.localStorage.getItem('reservapro_lang') || 'es' : 'es',
   fallbackLng: 'es',
+  supportedLngs: ['es', 'en'],
+  nonExplicitSupportedLngs: true,
+  load: 'languageOnly',
   interpolation: {
     escapeValue: false
   }

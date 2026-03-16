@@ -1,19 +1,50 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MainLayout from '../../src/components/MainLayout';
 import { Colors } from '../../src/constants/colors';
+import { supabase } from '../../src/lib/supabaseClient';
+
+type FeedbackSummary = {
+  total_reviews: number;
+  average_rating: number;
+};
 
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
 
-  const stats = (t('hero.stats', { returnObjects: true }) || []) as Array<{ value: string; label: string }>;
+  const baseStats = (t('hero.stats', { returnObjects: true }) || []) as Array<{ value: string; label: string }>;
+  const stats = useMemo(() => {
+    if (!feedbackSummary || feedbackSummary.total_reviews <= 0 || baseStats.length < 2) {
+      return baseStats;
+    }
+    return [
+      baseStats[0],
+      {
+        value: `${Number(feedbackSummary.average_rating).toFixed(1)}/5`,
+        label: t('hero.averageFromReviews', { count: feedbackSummary.total_reviews }),
+      },
+    ];
+  }, [baseStats, feedbackSummary, t]);
   const team = (t('hero.card.team', { returnObjects: true }) || []) as string[];
   const highlights = (t('highlights.items', { returnObjects: true }) || []) as Array<{ icon: string; title: string; description: string }>;
   const steps = (t('flow.steps', { returnObjects: true }) || []) as Array<{ step: string; title: string; description: string }>;
   const testimonials = (t('testimonials.items', { returnObjects: true }) || []) as Array<{ quote: string; name: string; role: string }>;
+
+  useEffect(() => {
+    const fetchFeedbackSummary = async () => {
+      const { data } = await supabase.from('feedback_summary_view').select('*').limit(1).maybeSingle();
+      if (!data) return;
+      setFeedbackSummary({
+        total_reviews: Number(data.total_reviews ?? 0),
+        average_rating: Number(data.average_rating ?? 0),
+      });
+    };
+    void fetchFeedbackSummary();
+  }, []);
 
   return (
     <MainLayout>
@@ -124,7 +155,7 @@ export default function HomeScreen() {
             <Pressable style={styles.btnPrimary} onPress={() => router.push('/reservations/new')}>
               <Text style={styles.btnPrimaryText}>{t('cta.primary')}</Text>
             </Pressable>
-            <Pressable style={styles.btnGhost} onPress={() => router.push('/auth')}>
+            <Pressable style={styles.btnGhost} onPress={() => router.push('/contact' as any)}>
               <Text style={styles.btnGhostText}>{t('cta.secondary')}</Text>
             </Pressable>
           </View>

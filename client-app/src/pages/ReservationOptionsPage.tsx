@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
@@ -13,6 +14,7 @@ export type ReservationOption = {
   duration_minutes: number;
   base_price: number;
   currency_code?: string | null;
+  image_url?: string | null;
 };
 
 export function ReservationOptionsPage() {
@@ -30,7 +32,7 @@ export function ReservationOptionsPage() {
     fetchOptions();
   }, []);
 
-  const badges = useMemo(() => t('options.badges', { returnObjects: true }) as string[], [t]);
+  const badges = useMemo(() => t('options.badges', { returnObjects: true }) as string[], [t, i18n.language]);
   const locale = i18n.language === 'es' ? 'es-CR' : 'en-US';
 
   if (loading) {
@@ -61,6 +63,17 @@ export function ReservationOptionsPage() {
               transition={{ duration: 0.45, delay: index * 0.08 }}
               viewport={{ once: true, amount: 0.3 }}
             >
+              {option.image_url ? (
+                <div className="mb-6 overflow-hidden rounded-2xl border border-white/10">
+                  <img
+                    src={option.image_url}
+                    alt={option.name}
+                    className="h-44 w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              ) : null}
+
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="font-display text-2xl font-semibold">{option.name}</h2>
@@ -94,6 +107,14 @@ export function ReservationOptionsPage() {
                     {badge}
                   </span>
                 ))}
+              </div>
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <Link
+                  to={`/reservations/new?optionId=${option.id}`}
+                  className="text-lg font-semibold text-brand-primary transition hover:text-brand-accent"
+                >
+                  {t('options.bookNow')} {'->'}
+                </Link>
               </div>
             </motion.article>
           ))}

@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSupabase } from '../providers/SupabaseProvider';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
+import { downloadReservationPdf } from '../utils/reservationPdf';
 
 type ExperienceOption = {
   id: string;
@@ -21,9 +23,11 @@ type AvailabilitySlot = {
 export function CreateReservationPage() {
   const { client, session } = useSupabase();
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [options, setOptions] = useState<ExperienceOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('');
-  const [scheduledFor, setScheduledFor] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
   const [notes, setNotes] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -31,7 +35,7 @@ export function CreateReservationPage() {
   const [contactPreference, setContactPreference] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successId, setSuccessId] = useState<string | null>(null);
+  const [successCode, setSuccessCode] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
 
@@ -49,6 +53,13 @@ export function CreateReservationPage() {
 
     fetchOptions();
   }, [client]);
+
+  useEffect(() => {
+    const optionFromQuery = searchParams.get('optionId');
+    if (optionFromQuery) {
+      setSelectedOption(optionFromQuery);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -73,6 +84,18 @@ export function CreateReservationPage() {
 
     loadProfile();
   }, [client, session?.user?.id]);
+
+  const useSavedProfile = async () => {
+    if (!session?.user?.id) return;
+    const { data } = await client
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if (data?.full_name) setFullName(data.full_name);
+    if (data?.phone) setPhone(data.phone);
+  };
 
   useEffect(() => {
     if (!selectedOption) {
@@ -121,10 +144,15 @@ export function CreateReservationPage() {
     setSubmitting(true);
     setError(null);
 
+    const composedDateTime = scheduledDate
+      ? `${scheduledDate}T${scheduledTime || '10:00'}`
+      : null;
+    const scheduledFor = composedDateTime ? new Date(composedDateTime).toISOString() : null;
+
     const { data, error: rpcError } = await client.rpc('client_create_reservation', {
       reservation_input: {
         service_option_id: selectedOption,
-        scheduled_for: scheduledFor || null,
+        scheduled_for: scheduledFor,
         notes,
         contact_full_name: fullName.trim(),
         contact_phone: phone.trim(),
@@ -136,11 +164,14 @@ export function CreateReservationPage() {
     if (rpcError) {
       setError(t('booking.errors.generic'));
     } else if (data?.reservation_id) {
-      setSuccessId(data.reservation_id as string);
-      setScheduledFor('');
-      setNotes('');
-      setPartySize('');
-      setContactPreference('');
+      const { data: reservationData } = await client
+        .from('reservations')
+        .select('public_reference')
+        .eq('id', data.reservation_id)
+        .maybeSingle();
+
+      const finalCode = reservationData?.public_reference ?? (data.reservation_id as string);
+      setSuccessCode(finalCode);
     }
 
     setSubmitting(false);
@@ -238,17 +269,36 @@ export function CreateReservationPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-white/80" htmlFor="scheduled_for">
-              {t('booking.datetimeLabel')}
-            </label>
-            <input
-              id="scheduled_for"
-              name="scheduled_for"
-              value={scheduledFor}
-              onChange={(event) => setScheduledFor(event.target.value)}
-              type="datetime-local"
-              className="mt-2 w-full rounded-2xl border border-white/20 bg-brand-background/60 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-brand-accent/60"
-            />
+            <p className="block text-sm font-semibold text-white/80">{t('booking.datetimeLabel')}</p>
+            <div className="mt-2 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/50" htmlFor="scheduled_date">
+                  {t('booking.dateLabel')}
+                </label>
+                <input
+                  id="scheduled_date"
+                  name="scheduled_date"
+                  value={scheduledDate}
+                  onChange={(event) => setScheduledDate(event.target.value)}
+                  type="date"
+                  className="mt-2 w-full rounded-2xl border border-white/20 bg-brand-background/60 px-4 py-3 text-sm text-white focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-brand-accent/60"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/50" htmlFor="scheduled_time">
+                  {t('booking.timeLabel')}
+                </label>
+                <input
+                  id="scheduled_time"
+                  name="scheduled_time"
+                  value={scheduledTime}
+                  onChange={(event) => setScheduledTime(event.target.value)}
+                  type="time"
+                  step={900}
+                  className="mt-2 w-full rounded-2xl border border-white/20 bg-brand-background/60 px-4 py-3 text-sm text-white focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-brand-accent/60"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -283,6 +333,10 @@ export function CreateReservationPage() {
               />
             </div>
           </div>
+
+          <button type="button" onClick={useSavedProfile} className="btn btn-ghost border-white/25">
+            {t('booking.useSavedProfile')}
+          </button>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -356,8 +410,34 @@ export function CreateReservationPage() {
           </div>
 
           {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-          {successId ? (
-            <p className="text-sm text-emerald-300">{t('booking.success', { code: successId })}</p>
+          {successCode ? (
+            <div className="space-y-3 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4">
+              <p className="text-sm text-emerald-100">{t('booking.success', { code: successCode })}</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadReservationPdf({
+                      reference: successCode,
+                      fullName,
+                      phone,
+                      scheduledDate,
+                      scheduledTime,
+                      notes,
+                      contactPreference,
+                      partySize,
+                      optionName: options.find((opt) => opt.id === selectedOption)?.name ?? ''
+                    })
+                  }
+                  className="btn btn-ghost border-white/30"
+                >
+                  {t('booking.downloadPdf')}
+                </button>
+                <Link to="/reservations/mine" className="btn btn-primary">
+                  {t('booking.viewMine')}
+                </Link>
+              </div>
+            </div>
           ) : null}
         </motion.form>
       </Container>

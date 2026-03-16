@@ -16,25 +16,26 @@ const translation = {
     }
   },
   hero: {
-    badge: 'Experience Costa Rica',
-    titleLead: 'Reserve authentic adventures in',
-    titleHighlight: 'Costa Rica',
+    badge: 'Premium reservations platform',
+    titleLead: 'Book memorable experiences with',
+    titleHighlight: 'ReservaPro',
     description:
-      'Discover white-sand beaches, canopy tours over volcanoes, and sloth encounters led by local experts.',
+      'Plan venues, catering, and wellness sessions with fast confirmation and real-time tracking.',
     primaryCta: 'Plan experience',
     secondaryCta: 'View catalog',
     stats: [
-      { value: '320+', label: 'Curated tropical experiences' },
-      { value: '4.9/5', label: 'Average traveler rating' }
+      { value: '120+', label: 'Active catalog experiences' },
+      { value: '< 24h', label: 'Average first response time' }
     ],
+    averageFromReviews: 'Average based on {{count}} reviews',
     card: {
       statusTitle: 'Current status',
-      itinerary: 'Caribbean itinerary',
-      schedule: '12 July 2026 • 2 guests',
+      itinerary: 'Premium request',
+      schedule: '17 March 2026 • 12 guests',
       teamTitle: 'Assigned team',
-      team: ['Naturalist guide', 'Private driver', 'Local chef'],
+      team: ['Event coordinator', 'Main vendor', 'On-site support'],
       testimonial:
-        '“We watched turtles hatch at dawn and enjoyed gourmet coffee facing the Arenal Volcano.”'
+        '“My reservation was confirmed within hours and all details were clear in one place.”'
     }
   },
   highlights: {
@@ -116,7 +117,7 @@ const translation = {
   },
   footer: {
     description:
-      'Inspiring responsible travel across Costa Rica: Caribbean shores, active volcanoes, and wildlife-rich rainforests.',
+      'Reservation platform for premium experiences, spaces, and services with real-time tracking.',
     links: {
       experiences: 'Experiences',
       plan: 'Plan trip',
@@ -268,6 +269,13 @@ const translation = {
     notesEmpty: 'No notes were provided.',
     unscheduled: 'To be confirmed',
     unnamedExperience: 'Costa Rica experience'
+  },
+  contact: {
+    title: 'Talk to an expert',
+    description: 'Reach out through your preferred channel and we will help you close your reservation.',
+    whatsappHint: 'Fast response for immediate coordination.',
+    emailHint: 'Best for detailed requirements and quotes.',
+    phoneHint: 'Direct attention for personalized support.'
   }
 };
 

@@ -1,11 +1,13 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
     ActivityIndicator,
     Platform,
     Pressable,
+  ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -15,13 +17,37 @@ import MainLayout from '../../src/components/MainLayout';
 import { Picker } from '../../src/components/Picker';
 import { Colors } from '../../src/constants/colors';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
+import { downloadReservationPdf } from '../../src/utils/reservationPdf';
 
 type ExperienceOption = { id: string; name: string; description: string | null };
 type AvailabilitySlot = { weekday: number; start_time: string; end_time: string; capacity: number };
 
+function toMinutes(time: string): number {
+  const [h, m] = time.slice(0, 5).split(':').map(Number);
+  return h * 60 + m;
+}
+
+function hhmmFromDate(value: Date): string {
+  const hh = String(value.getHours()).padStart(2, '0');
+  const mm = String(value.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function buildSlotTimes(startTime: string, endTime: string): string[] {
+  const start = toMinutes(startTime);
+  const end = toMinutes(endTime);
+  const times: string[] = [];
+  for (let current = start; current < end; current += 15) {
+    const hh = String(Math.floor(current / 60)).padStart(2, '0');
+    const mm = String(current % 60).padStart(2, '0');
+    times.push(`${hh}:${mm}`);
+  }
+  return times;
+}
+
 export default function CreateReservationPage() {
   const { client, session } = useSupabase();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { optionId } = useLocalSearchParams<{ optionId?: string }>();
 
@@ -31,6 +57,8 @@ export default function CreateReservationPage() {
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [webDate, setWebDate] = useState('');
+  const [webTime, setWebTime] = useState('');
   const [notes, setNotes] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -44,6 +72,77 @@ export default function CreateReservationPage() {
   const [bookedName, setBookedName] = useState('');
 
   const selectedExperience = options.find((o) => o.id === selectedOption);
+  const allowedWeekdays = useMemo(() => new Set(availability.map((slot) => slot.weekday)), [availability]);
+  const hasAvailabilityRules = availability.length > 0;
+
+  const selectedWeekday = useMemo(() => {
+    if (Platform.OS === 'web') {
+      if (!webDate) return null;
+      return new Date(`${webDate}T10:00:00`).getDay();
+    }
+    return selectedDate ? selectedDate.getDay() : null;
+  }, [selectedDate, webDate]);
+
+  const isTimeAllowed = (weekday: number, timeHHMM: string) => {
+    if (!hasAvailabilityRules) return true;
+    const target = toMinutes(timeHHMM);
+    return availability
+      .filter((slot) => slot.weekday === weekday)
+      .some((slot) => target >= toMinutes(slot.start_time) && target < toMinutes(slot.end_time));
+  };
+
+  const webDateItems = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 30 }).map((_, idx) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() + idx);
+      const iso = d.toISOString().slice(0, 10);
+      const weekday = d.getDay();
+      const isAllowedDay = !hasAvailabilityRules || allowedWeekdays.has(weekday);
+      const label = d.toLocaleDateString(i18n.language.startsWith('es') ? 'es-CR' : 'en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+      });
+      return { label, value: iso, weekday, isAllowedDay };
+    });
+  }, [allowedWeekdays, hasAvailabilityRules, i18n.language]);
+
+  const filteredWebDateItems = useMemo(
+    () => webDateItems.filter((item) => item.isAllowedDay),
+    [webDateItems],
+  );
+
+  const webTimeItems = useMemo(() => {
+    const items: { label: string; value: string }[] = [];
+    if (hasAvailabilityRules) {
+      if (selectedWeekday === null) return items;
+      const byDay = availability.filter((slot) => slot.weekday === selectedWeekday);
+      const unique = new Set<string>();
+      byDay.forEach((slot) => {
+        buildSlotTimes(slot.start_time, slot.end_time).forEach((time) => unique.add(time));
+      });
+      return Array.from(unique)
+        .sort((a, b) => toMinutes(a) - toMinutes(b))
+        .map((value) => ({ label: value, value }));
+    }
+
+    for (let h = 7; h <= 22; h += 1) {
+      for (const m of [0, 15, 30, 45]) {
+        const hh = String(h).padStart(2, '0');
+        const mm = String(m).padStart(2, '0');
+        items.push({ label: `${hh}:${mm}`, value: `${hh}:${mm}` });
+      }
+    }
+    return items;
+  }, [availability, hasAvailabilityRules, selectedWeekday]);
+
+  const selectedDateLabel = webDate
+    ? webDateItems.find((d) => d.value === webDate)?.label ?? webDate
+    : selectedDate
+      ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '';
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -78,6 +177,19 @@ export default function CreateReservationPage() {
     fetchAvailability();
   }, [client, selectedOption]);
 
+  useEffect(() => {
+    setSelectedDate(null);
+    setSelectedTime(null);
+    setWebDate('');
+    setWebTime('');
+  }, [selectedOption]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!webDate || webTimeItems.some((item) => item.value === webTime)) return;
+    setWebTime('');
+  }, [webDate, webTime, webTimeItems]);
+
   const handleSubmit = async () => {
     if (!selectedOption) { setError(t('booking.errors.noOption')); return; }
     if (!fullName.trim() || !phone.trim()) { setError(t('booking.errors.missingContact')); return; }
@@ -89,12 +201,50 @@ export default function CreateReservationPage() {
 
     // Compose scheduled_for from date + time pickers
     let scheduledFor: string | null = null;
-    if (selectedDate) {
-      const d = new Date(selectedDate);
-      if (selectedTime) {
-        d.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+    if (Platform.OS === 'web' && webDate) {
+      if (!webTime) {
+        setSubmitting(false);
+        setError('Selecciona una hora disponible para esta experiencia.');
+        return;
       }
+      const weekday = new Date(`${webDate}T10:00:00`).getDay();
+      if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
+        setSubmitting(false);
+        setError('La fecha seleccionada no esta disponible para esta experiencia.');
+        return;
+      }
+      if (!isTimeAllowed(weekday, webTime)) {
+        setSubmitting(false);
+        setError('La hora seleccionada no esta disponible para esta experiencia.');
+        return;
+      }
+      const d = new Date(`${webDate}T${webTime}:00`);
       scheduledFor = d.toISOString();
+    } else if (selectedDate) {
+      if (!selectedTime) {
+        setSubmitting(false);
+        setError('Selecciona una hora disponible para esta experiencia.');
+        return;
+      }
+      const weekday = selectedDate.getDay();
+      const selectedHHMM = hhmmFromDate(selectedTime);
+      if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
+        setSubmitting(false);
+        setError('La fecha seleccionada no esta disponible para esta experiencia.');
+        return;
+      }
+      if (!isTimeAllowed(weekday, selectedHHMM)) {
+        setSubmitting(false);
+        setError('La hora seleccionada no esta disponible para esta experiencia.');
+        return;
+      }
+      const d = new Date(selectedDate);
+      d.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+      scheduledFor = d.toISOString();
+    } else {
+      setSubmitting(false);
+      setError('Selecciona fecha y hora para completar la reserva.');
+      return;
     }
 
     const payload: Record<string, unknown> = {
@@ -177,11 +327,36 @@ export default function CreateReservationPage() {
               setSelectedOption('');
               setSelectedDate(null);
               setSelectedTime(null);
+              setWebDate('');
+              setWebTime('');
               setNotes('');
               setPartySize('');
               setContactPreference('');
             }}>
               <Text style={styles.btnGhostText}>Hacer otra reserva</Text>
+            </Pressable>
+            <Pressable
+              style={styles.btnOutline}
+              onPress={() => {
+                const printed = downloadReservationPdf({
+                  reference: trackingCode,
+                  optionName: bookedName,
+                  fullName,
+                  phone,
+                  scheduledDate: selectedDateLabel,
+                  scheduledTime: webTime || (selectedTime
+                    ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                    : ''),
+                  partySize,
+                  contactPreference,
+                  notes,
+                });
+                if (!printed) {
+                  Alert.alert('PDF', 'La descarga PDF por impresión está disponible en la versión web.');
+                }
+              }}
+            >
+              <Text style={styles.btnOutlineText}>Descargar PDF</Text>
             </Pressable>
           </View>
         </View>
@@ -274,39 +449,69 @@ export default function CreateReservationPage() {
           </View>
 
           <View style={styles.dateTimeRow}>
-            {/* Date picker */}
             <View style={styles.dateTimeCol}>
               <Text style={styles.label}>📅  Fecha</Text>
-              <Pressable
-                style={styles.dateBtn}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={selectedDate ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
-                  {selectedDate
-                    ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
-                    : 'Seleccionar fecha'}
-                </Text>
-              </Pressable>
+              {Platform.OS === 'web' ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                  {filteredWebDateItems.slice(0, 14).map((item) => {
+                    const active = webDate === item.value;
+                    return (
+                      <Pressable
+                        key={item.value}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => setWebDate(item.value)}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <Pressable style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
+                  <Text style={selectedDate ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
+                    {selectedDate
+                      ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : 'Seleccionar fecha'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
-            {/* Time picker */}
             <View style={styles.dateTimeCol}>
               <Text style={styles.label}>🕐  Hora</Text>
-              <Pressable
-                style={styles.dateBtn}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={selectedTime ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
-                  {selectedTime
-                    ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
-                    : 'Seleccionar hora'}
-                </Text>
-              </Pressable>
+              {Platform.OS === 'web' ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                  {webTimeItems.map((item) => {
+                    const active = webTime === item.value;
+                    return (
+                      <Pressable
+                        key={item.value}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => setWebTime(item.value)}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <Pressable style={styles.dateBtn} onPress={() => setShowTimePicker(true)}>
+                  <Text style={selectedTime ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
+                    {selectedTime
+                      ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
+                      : 'Seleccionar hora'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           </View>
 
-          {/* iOS inline pickers */}
-          {showDatePicker && (
+          {Platform.OS === 'web' && selectedOption && webDate && webTimeItems.length === 0 ? (
+            <Text style={styles.helperText}>No hay horarios disponibles para la fecha seleccionada.</Text>
+          ) : null}
+
+          {/* Native inline pickers */}
+          {Platform.OS !== 'web' && showDatePicker && (
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={selectedDate ?? new Date()}
@@ -327,7 +532,7 @@ export default function CreateReservationPage() {
               )}
             </View>
           )}
-          {showTimePicker && (
+          {Platform.OS !== 'web' && showTimePicker && (
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={selectedTime ?? new Date()}
@@ -541,6 +746,22 @@ const styles = StyleSheet.create({
   // Date/time pickers
   dateTimeRow: { flexDirection: 'row', gap: 12 },
   dateTimeCol: { flex: 1 },
+  chipsRow: { gap: 8, paddingBottom: 4 },
+  chip: {
+    borderWidth: 1,
+    borderColor: Colors.white20,
+    backgroundColor: 'rgba(2,44,34,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipActive: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(14,165,233,0.2)',
+  },
+  chipText: { color: Colors.white70, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  helperText: { color: Colors.white50, fontSize: 12, marginTop: 8 },
   dateBtn: {
     borderWidth: 1, borderColor: Colors.white15, backgroundColor: 'rgba(2,44,34,0.5)',
     borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,

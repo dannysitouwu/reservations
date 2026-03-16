@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSupabase } from '../providers/SupabaseProvider';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
+import { downloadReservationPdf } from '../utils/reservationPdf';
 
 type ReservationDetail = {
   id: string;
@@ -25,6 +26,8 @@ export function MyReservationsPage() {
   const [reservations, setReservations] = useState<ReservationDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackByReservation, setFeedbackByReservation] = useState<Record<string, { rating: number; comment: string }>>({});
+  const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
 
   const locale = useMemo(() => (i18n.language.startsWith('es') ? 'es-CR' : 'en-US'), [i18n.language]);
   const contactPreferenceOptions = useMemo(
@@ -54,6 +57,11 @@ export function MyReservationsPage() {
         .eq('buyer_id', session.user.id)
         .order('created_at', { ascending: false });
 
+      const { data: feedbackRows } = await client
+        .from('reservation_feedback')
+        .select('reservation_id, rating, comment')
+        .eq('buyer_id', session.user.id);
+
       if (!isMounted) {
         return;
       }
@@ -63,6 +71,14 @@ export function MyReservationsPage() {
         setReservations([]);
       } else {
         setReservations((data as ReservationDetail[]) ?? []);
+        const feedbackMap: Record<string, { rating: number; comment: string }> = {};
+        (feedbackRows ?? []).forEach((row) => {
+          feedbackMap[row.reservation_id as string] = {
+            rating: Number(row.rating ?? 5),
+            comment: String(row.comment ?? '')
+          };
+        });
+        setFeedbackByReservation(feedbackMap);
       }
 
       setLoading(false);
@@ -93,6 +109,34 @@ export function MyReservationsPage() {
       </section>
     );
   }
+
+  const updateFeedbackField = (reservationId: string, field: 'rating' | 'comment', value: string) => {
+    setFeedbackByReservation((prev) => ({
+      ...prev,
+      [reservationId]: {
+        rating: field === 'rating' ? Number(value) : prev[reservationId]?.rating ?? 5,
+        comment: field === 'comment' ? value : prev[reservationId]?.comment ?? ''
+      }
+    }));
+  };
+
+  const submitFeedback = async (reservationId: string) => {
+    const payload = feedbackByReservation[reservationId] ?? { rating: 5, comment: '' };
+    setSavingFeedbackId(reservationId);
+    const { error: saveError } = await client.from('reservation_feedback').upsert(
+      {
+        reservation_id: reservationId,
+        buyer_id: session.user.id,
+        rating: payload.rating,
+        comment: payload.comment || null
+      },
+      { onConflict: 'reservation_id' }
+    );
+    if (saveError) {
+      setError(t('myReservations.feedbackError'));
+    }
+    setSavingFeedbackId(null);
+  };
 
   return (
     <section className="py-24 text-white">
@@ -144,6 +188,7 @@ export function MyReservationsPage() {
               const contactPreferenceLabel = reservation.contact_preference
                 ? contactPreferenceOptions[reservation.contact_preference as keyof typeof contactPreferenceOptions] ?? t('myReservations.contactPreferenceNone')
                 : t('myReservations.contactPreferenceNone');
+              const referenceCode = reservation.public_reference || reservation.id.slice(0, 8).toUpperCase();
 
               return (
                 <motion.div
@@ -157,7 +202,7 @@ export function MyReservationsPage() {
                         {reservation.service_name ?? t('myReservations.unnamedExperience')}
                       </h3>
                       <p className="text-sm text-white/60">
-                        {t('myReservations.reference', { code: reservation.public_reference })}
+                        {t('myReservations.reference', { code: referenceCode })}
                       </p>
                     </div>
                     <span className="inline-flex items-center rounded-full border border-white/20 px-3 py-1 text-xs uppercase tracking-[0.3em] text-white/80">
@@ -194,6 +239,71 @@ export function MyReservationsPage() {
                         : t('myReservations.notesEmpty')}
                     </p>
                   </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(referenceCode);
+                      }}
+                      className="btn btn-ghost border-white/25"
+                    >
+                      {t('myReservations.copyCode')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadReservationPdf({
+                          reference: referenceCode,
+                          fullName: '',
+                          phone: '',
+                          scheduledDate: reservation.scheduled_for ? new Date(reservation.scheduled_for).toLocaleDateString(locale) : '',
+                          scheduledTime: reservation.scheduled_for ? new Date(reservation.scheduled_for).toLocaleTimeString(locale) : '',
+                          notes: reservation.notes ?? '',
+                          contactPreference: contactPreferenceLabel,
+                          partySize: reservation.party_size ? String(reservation.party_size) : '',
+                          optionName: reservation.service_name
+                        })
+                      }
+                      className="btn btn-ghost border-white/25"
+                    >
+                      {t('myReservations.downloadPdf')}
+                    </button>
+                  </div>
+
+                  {reservation.status === 'fulfilled' ? (
+                    <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 p-4">
+                      <p className="text-sm font-semibold text-white/85">{t('myReservations.feedbackTitle')}</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-[170px_1fr]">
+                        <select
+                          value={String(feedbackByReservation[reservation.id]?.rating ?? 5)}
+                          onChange={(event) => updateFeedbackField(reservation.id, 'rating', event.target.value)}
+                          className="rounded-xl border border-white/20 bg-brand-background/60 px-3 py-2 text-sm text-white"
+                        >
+                          {[5, 4, 3, 2, 1].map((score) => (
+                            <option key={score} value={score}>
+                              {t('myReservations.feedbackScore', { score })}
+                            </option>
+                          ))}
+                        </select>
+                        <textarea
+                          value={feedbackByReservation[reservation.id]?.comment ?? ''}
+                          onChange={(event) => updateFeedbackField(reservation.id, 'comment', event.target.value)}
+                          rows={2}
+                          placeholder={t('myReservations.feedbackPlaceholder') as string}
+                          className="rounded-xl border border-white/20 bg-brand-background/60 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => submitFeedback(reservation.id)}
+                        disabled={savingFeedbackId === reservation.id}
+                        className="btn btn-primary mt-3"
+                      >
+                        {savingFeedbackId === reservation.id ? t('myReservations.savingFeedback') : t('myReservations.saveFeedback')}
+                      </button>
+                    </div>
+                  ) : null}
                 </motion.div>
               );
             })

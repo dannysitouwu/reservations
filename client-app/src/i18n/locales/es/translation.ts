@@ -8,6 +8,7 @@ const translation = {
       { to: '/reservations/mine', label: 'Mis reservas' }
     ],
     signIn: 'Iniciar sesión',
+    mobileMenu: 'Abrir menú',
     concierge: 'Acceso concierge',
     language: {
       label: 'Idioma',
@@ -16,47 +17,48 @@ const translation = {
     }
   },
   hero: {
-    badge: 'Vive Costa Rica',
-    titleLead: 'Reserva aventuras auténticas en',
-    titleHighlight: 'Costa Rica',
+    badge: 'Eventos y experiencias premium',
+    titleLead: 'Reserva experiencias memorables con',
+    titleHighlight: 'ReservaPro',
     description:
-      'Explora playas de arena blanca, canopy entre volcanes y encuentros con perezosos guiados por expertos locales.',
+      'Organiza espacios, catering y sesiones de bienestar con confirmación rápida y seguimiento en tiempo real.',
     primaryCta: 'Planear experiencia',
     secondaryCta: 'Ver catálogo',
     stats: [
-      { value: '320+', label: 'Experiencias tropicales seleccionadas' },
-      { value: '4.9/5', label: 'Calificación promedio de viajeros' }
+      { value: '120+', label: 'Experiencias activas en catálogo' },
+      { value: '< 24h', label: 'Tiempo promedio de primera respuesta' }
     ],
+    averageFromReviews: 'Promedio basado en {{count}} evaluaciones',
     card: {
       statusTitle: 'Estado actual',
-      itinerary: 'Itinerario Caribe',
-      schedule: '12 julio 2026 • 2 personas',
+      itinerary: 'Solicitud premium',
+      schedule: '17 marzo 2026 • 12 personas',
       teamTitle: 'Equipo asignado',
-      team: ['Guía naturalista', 'Conductor privado', 'Chef local'],
+      team: ['Coordinador de evento', 'Proveedor principal', 'Soporte en sitio'],
       testimonial:
-        '“Disfrutamos tortugas anidando al amanecer y un café gourmet con vista al volcán Arenal.”'
+        '“Confirmaron mi reserva en horas y recibí toda la información clara en un solo lugar.”'
     }
   },
   highlights: {
     eyebrow: 'Por qué reservar con nosotros',
-    title: 'Una ventana a la esencia costarricense',
+    title: 'Una plataforma enfocada en resultados',
     description:
-      'Diseñamos itinerarios responsables que conectan playas del Pacífico, selvas nubosas y pueblos con sabor a pura vida.',
+      'Centralizamos todo el flujo de reserva para que tu experiencia sea simple, profesional y trazable.',
     items: [
       {
-        icon: '🌊',
-        title: 'Red de expertos locales',
-        description: 'Guías certificados que comparten secretos de Cahuita, Monteverde y las montañas de Talamanca.'
+        icon: '🧭',
+        title: 'Coordinación experta',
+        description: 'Un concierge humano revisa tu solicitud y te contacta por el canal que prefieras.'
       },
       {
-        icon: '🦥',
-        title: 'Encuentros sostenibles',
-        description: 'Observa perezosos y guacamayas en centros de conservación con impacto directo en la comunidad.'
+        icon: '📲',
+        title: 'Seguimiento con código',
+        description: 'Cada reserva genera un código único para consultar estado y detalles cuando lo necesites.'
       },
       {
-        icon: '🌋',
-        title: 'Aventura y bienestar',
-        description: 'Canopy sobre volcanes, rafting en el Pacuare y retiros termales en La Fortuna.'
+        icon: '✅',
+        title: 'Operación confiable',
+        description: 'Disponibilidad, contacto y notas quedan registradas para evitar pérdidas de información.'
       }
     ]
   },
@@ -116,7 +118,7 @@ const translation = {
   },
   footer: {
     description:
-      'Inspirando viajes responsables por Costa Rica: playas caribeñas, volcanes activos y selvas llenas de vida.',
+      'Plataforma de reservas para experiencias, espacios y servicios premium con seguimiento en tiempo real.',
     links: {
       experiences: 'Experiencias',
       plan: 'Planificar viaje',
@@ -130,8 +132,10 @@ const translation = {
     description:
       'Completa los detalles para conectar con un concierge certificado que confirmará disponibilidad y coordinará traslados.',
     selectLabel: 'Selecciona una experiencia',
-    selectPlaceholder: 'Elige una experiencia en Costa Rica',
+    selectPlaceholder: 'Elige una experiencia',
     datetimeLabel: 'Fecha y hora preferida',
+    dateLabel: 'Fecha',
+    timeLabel: 'Hora',
     fullNameLabel: 'Nombre completo',
     fullNamePlaceholder: '¿Con quién coordinamos la experiencia?',
     phoneLabel: 'Número de teléfono',
@@ -140,6 +144,7 @@ const translation = {
     partySizePlaceholder: 'Ej. 4',
     contactPreferenceLabel: 'Preferencia de contacto',
     contactPreferencePlaceholder: 'Elige cómo prefieres que te contactemos',
+    useSavedProfile: 'Usar datos guardados de mi cuenta',
     contactPreferenceOptions: {
       whatsapp: 'WhatsApp',
       email: 'Correo electrónico',
@@ -149,6 +154,8 @@ const translation = {
     notesLabel: 'Detalles especiales',
     notesPlaceholder: 'Cuéntanos sobre edades, intereses o requerimientos alimentarios',
     submit: 'Enviar reserva',
+    downloadPdf: 'Descargar comprobante (PDF)',
+    viewMine: 'Ir a mis reservas',
     submitting: 'Enviando…',
     success: '¡Reserva enviada! Tu código es {{code}}',
     errors: {
@@ -183,12 +190,13 @@ const translation = {
     rejected: 'Rechazada'
   },
   options: {
-    eyebrow: 'Colección Costa Caribe - Pacífico',
-    title: 'Colección de experiencias costarricenses',
+    eyebrow: 'Catálogo activo',
+    title: 'Colección de experiencias y servicios',
     description:
-      'Explora aventuras personalizadas desde el Caribe hasta el Pacífico. Cada opción incluye guías bilingües y transporte seguro.',
+      'Explora opciones configurables para eventos, bienestar y experiencias privadas. Puedes reservar en minutos.',
     curatedTag: 'Curada',
     badges: ['Aventura', 'Naturaleza', 'Bienestar'],
+    bookNow: 'Reservar ahora',
     loading: 'Cargando experiencias tropicales…'
   },
   statusPage: {
@@ -234,6 +242,13 @@ const translation = {
     haveAccount: '¿Ya tienes una cuenta?',
     createAccount: 'Crear cuenta',
     signInHere: 'Inicia sesión aquí',
+    profileFirstName: 'Nombre',
+    profileLastName: 'Apellidos',
+    profilePhone: 'Teléfono',
+    profileUsername: 'Username (estético)',
+    saveProfile: 'Guardar perfil',
+    savingProfile: 'Guardando perfil…',
+    profileSaved: 'Perfil actualizado correctamente.',
     passwordMismatch: 'Las contraseñas no coinciden.',
     checkEmail: 'Revisa {{email}} para confirmar tu cuenta antes de iniciar sesión.'
   },
@@ -257,6 +272,14 @@ const translation = {
     signInDescription: 'Inicia sesión para ver experiencias próximas y gestionar tus solicitudes.',
     signInCta: 'Iniciar sesión',
     reference: 'Referencia • {{code}}',
+    copyCode: 'Copiar código',
+    downloadPdf: 'Descargar PDF',
+    feedbackTitle: 'Califica tu experiencia',
+    feedbackPlaceholder: 'Comparte tu comentario (opcional)',
+    feedbackScore: '{{score}} estrellas',
+    saveFeedback: 'Guardar evaluación',
+    savingFeedback: 'Guardando…',
+    feedbackError: 'No se pudo guardar tu evaluación.',
     scheduledFor: 'Programada para',
     createdAt: 'Creada el',
     partySize: 'Tamaño del grupo',
@@ -268,6 +291,13 @@ const translation = {
     notesEmpty: 'No se registraron notas.',
     unscheduled: 'Por confirmar',
     unnamedExperience: 'Experiencia en Costa Rica'
+  },
+  contact: {
+    title: 'Habla con un experto',
+    description: 'Contáctanos por el canal que prefieras y te ayudamos a cerrar tu reserva.',
+    whatsappHint: 'Respuesta rápida para coordinación inmediata.',
+    emailHint: 'Ideal para enviar requisitos detallados o cotizaciones.',
+    phoneHint: 'Atención directa para soporte personalizado.'
   }
 };
 
