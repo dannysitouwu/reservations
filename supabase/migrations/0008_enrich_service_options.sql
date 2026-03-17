@@ -2,7 +2,8 @@
 alter table public.service_options add column if not exists image_url text;
 
 -- Update the view to include image_url
-create or replace view public.service_options_view as
+drop view if exists public.service_options_view cascade;
+create view public.service_options_view as
 select
   so.id,
   so.name,

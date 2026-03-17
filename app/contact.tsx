@@ -1,8 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import MainLayout from '../src/components/MainLayout';
 import { Colors } from '../src/constants/colors';
-import { useTranslation } from 'react-i18next';
 
 export default function ContactPage() {
   const { t } = useTranslation();

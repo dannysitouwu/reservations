@@ -87,8 +87,29 @@ export default function MyReservationsPage() {
       setLoading(false);
     };
     void fetchReservations();
+
+    // Subscribe to real-time changes on reservations
+    const subscription = client
+      .channel('my-reservations')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reservations',
+          filter: `buyer_id=eq.${session?.user?.id}`,
+        },
+        () => {
+          if (isMounted) {
+            void fetchReservations();
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
+      subscription.unsubscribe();
     };
   }, [client, session?.user, t]);
 

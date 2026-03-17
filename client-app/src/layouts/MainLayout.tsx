@@ -1,8 +1,8 @@
 import { PropsWithChildren, useMemo, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Container } from '../components/ui/Container';
+import { Link, NavLink } from 'react-router-dom';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { Container } from '../components/ui/Container';
 
 export function MainLayout({ children }: PropsWithChildren) {
   const { t, i18n } = useTranslation();

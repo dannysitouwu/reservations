@@ -1,31 +1,81 @@
-import { PropsWithChildren, createContext, useContext, useMemo } from 'react';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type { SupabaseClient, Session } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import type { WorkerProfile } from '../types/profile';
 
 type SupabaseContextValue = {
   client: SupabaseClient;
-  profile: WorkerProfile;
+  profile: WorkerProfile | null;
+  session: Session | null;
+  loading: boolean;
 };
 
 const SupabaseContext = createContext<SupabaseContextValue | undefined>(undefined);
 
-const DEFAULT_ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL ?? 'administrador@gmail.com';
-const DEFAULT_ADMIN_NAME = import.meta.env.VITE_ADMIN_NAME ?? 'Administrador';
-
 export function SupabaseProvider({ children }: PropsWithChildren) {
-  const profile = useMemo<WorkerProfile>(
-    () => ({
-      id: 'static-admin',
-      email: DEFAULT_ADMIN_EMAIL,
-      full_name: DEFAULT_ADMIN_NAME,
-      phone: null,
-      role: 'admin'
-    }),
-    []
-  );
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<WorkerProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const value = useMemo(() => ({ client: supabase, profile }), [profile]);
+  useEffect(() => {
+    // Check current session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user.id) {
+        loadProfile(session.user.id);
+      } else {
+        setLoading(false);
+        navigate('/auth', { replace: true });
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user.id) {
+        loadProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+        navigate('/auth', { replace: true });
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, [navigate]);
+
+  const loadProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone, role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading profile:', error);
+        // Don't sign out on error - just continue with null profile
+      } else if (data) {
+        console.log('Profile loaded:', data);
+        setProfile(data as WorkerProfile);
+      } else {
+        console.warn('Profile not found for user:', userId);
+        // Don't sign out - profile might not exist yet
+      }
+    } catch (error) {
+      console.error('Unexpected error loading profile:', error);
+      // Don't sign out - continue anyway
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const value = useMemo(
+    () => ({ client: supabase, profile, session, loading }),
+    [profile, session, loading]
+  );
 
   return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>;
 }

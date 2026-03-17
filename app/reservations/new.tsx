@@ -3,11 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
     ActivityIndicator,
+    Alert,
     Platform,
     Pressable,
-  ScrollView,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,

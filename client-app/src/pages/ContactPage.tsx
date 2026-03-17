@@ -1,6 +1,6 @@
-import { SectionHeading } from '../components/ui/SectionHeading';
-import { Container } from '../components/ui/Container';
 import { useTranslation } from 'react-i18next';
+import { Container } from '../components/ui/Container';
+import { SectionHeading } from '../components/ui/SectionHeading';
 
 export function ContactPage() {
   const { t } = useTranslation();

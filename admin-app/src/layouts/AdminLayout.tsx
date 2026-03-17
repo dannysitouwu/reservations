@@ -1,8 +1,10 @@
-import { LayoutDashboard, CalendarClock, Users2, BarChart3 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, CalendarClock, Users2, BarChart3, LogOut, Plus } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { PropsWithChildren } from 'react';
 import { useSupabase } from '../providers/SupabaseProvider';
+import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
+import { supabase } from '../lib/supabaseClient';
 
 const navItems = [
   { to: '/', label: 'Resumen', icon: LayoutDashboard },
@@ -12,7 +14,13 @@ const navItems = [
 ];
 
 export function AdminLayout({ children }: PropsWithChildren) {
-  const { profile } = useSupabase();
+  const { profile, session } = useSupabase();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth', { replace: true });
+  };
 
   return (
     <div className="flex min-h-screen bg-surface-muted">
@@ -42,9 +50,38 @@ export function AdminLayout({ children }: PropsWithChildren) {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto space-y-3 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
-          <p className="font-semibold uppercase tracking-[0.2em]">Próxima actividad</p>
-          <p>Onboarding proveedores Caribe • 12 enero • 18:00</p>
+
+        <div className="my-6 h-px bg-white/10" />
+
+        <div className="mb-6 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/60">Gestión</p>
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-sidebar-foreground/80 hover:bg-white/10 hover:text-white"
+          >
+            <NavLink to="/services/new" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo servicio
+            </NavLink>
+          </Button>
+        </div>
+
+        <div className="mt-auto flex flex-col gap-4">
+          <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
+            <p className="font-semibold uppercase tracking-[0.2em]">Usuario activo</p>
+            <p className="truncate">{session?.user?.email}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="justify-start text-sidebar-foreground/80 hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Cerrar sesión
+          </Button>
         </div>
       </aside>
 
@@ -57,9 +94,19 @@ export function AdminLayout({ children }: PropsWithChildren) {
               {profile?.role ?? 'worker'}
             </span>
           </div>
-          <div className="text-right text-xs text-slate-400">
-            <p className="font-semibold text-slate-600">administrador@gmail.com</p>
-            <p>Sesión gestionada automáticamente</p>
+          <div className="flex items-center gap-4">
+            <div className="text-right text-xs text-slate-400">
+              <p className="font-semibold text-slate-600">{session?.user?.email}</p>
+              <p>Sesión activa</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </header>
         <main className="flex-1 space-y-6 bg-surface-muted px-6 py-8 lg:px-8">{children}</main>

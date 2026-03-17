@@ -1,6 +1,6 @@
+import { clsx } from 'clsx';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
 
 const LANG_OPTIONS = [
   { code: 'es', label: 'ES' },

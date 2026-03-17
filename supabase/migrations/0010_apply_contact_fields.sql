@@ -117,7 +117,8 @@ left join public.profiles worker on worker.id = r.assigned_worker_id
 join public.service_options so on so.id = r.service_option_id;
 
 -- 3. Updated public_find_reservation_by_reference
-create or replace function public.public_find_reservation_by_reference(reference_code text)
+drop function if exists public.public_find_reservation_by_reference(text) cascade;
+create function public.public_find_reservation_by_reference(reference_code text)
 returns table (
   id uuid,
   public_reference text,

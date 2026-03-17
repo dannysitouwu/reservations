@@ -2,10 +2,11 @@ import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
+import { supabase } from '../lib/supabaseClient';
 import { formatCurrency } from '../utils/currency';
+import { toSlug } from '../../../src/utils/slug';
 
 export type ReservationOption = {
   id: string;
@@ -97,7 +98,7 @@ export function ReservationOptionsPage() {
                     {i18n.language === 'es' ? 'Inversión desde' : 'Starting investment'}
                   </dt>
                   <dd className="mt-2 text-lg text-white">
-                    {formatCurrency(option.base_price, option.currency_code ?? 'CRC', locale)}
+                    {formatCurrency(option.base_price / 100, option.currency_code ?? 'CRC', locale)}
                   </dd>
                 </div>
               </dl>
@@ -110,7 +111,7 @@ export function ReservationOptionsPage() {
               </div>
               <div className="mt-6 border-t border-white/10 pt-5">
                 <Link
-                  to={`/reservations/new?optionId=${option.id}`}
+                  to={`/reservations/new?optionId=${option.id}&optionName=${toSlug(option.name)}`}
                   className="text-lg font-semibold text-brand-primary transition hover:text-brand-accent"
                 >
                   {t('options.bookNow')} {'->'}

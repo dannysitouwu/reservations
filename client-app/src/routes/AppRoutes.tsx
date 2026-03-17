@@ -4,10 +4,10 @@ import { AuthPage } from '../pages/AuthPage';
 import { ContactPage } from '../pages/ContactPage';
 import { CreateReservationPage } from '../pages/CreateReservationPage';
 import { HomePage } from '../pages/HomePage';
+import { MyReservationsPage } from '../pages/MyReservationsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ReservationOptionsPage } from '../pages/ReservationOptionsPage';
 import { ReservationStatusPage } from '../pages/ReservationStatusPage';
-import { MyReservationsPage } from '../pages/MyReservationsPage';
 
 export function AppRoutes() {
   return (

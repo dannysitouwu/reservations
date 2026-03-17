@@ -88,7 +88,7 @@ export default function ReservationOptionsPage() {
                     {i18n.language === 'es' ? 'Inversión desde' : 'Starting investment'}
                   </Text>
                   <Text style={styles.statValue}>
-                    {formatCurrency(option.base_price, option.currency_code ?? 'CRC', locale)}
+                    {formatCurrency(option.base_price / 100, option.currency_code ?? 'CRC', locale)}
                   </Text>
                 </View>
               </View>

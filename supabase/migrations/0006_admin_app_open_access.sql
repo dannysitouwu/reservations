@@ -1,13 +1,15 @@
 -- Relax policies and helper functions so the admin app can operate without Supabase Auth.
 
 -- Allow read access to profiles for the admin dashboard.
-create policy if not exists "Profiles: admin app read"
+drop policy if exists "Profiles: admin app read" on public.profiles;
+create policy "Profiles: admin app read"
   on public.profiles
   for select
   using (true);
 
 -- Allow read access to reservations for dashboard tables and detail views.
-create policy if not exists "Reservations: admin app read"
+drop policy if exists "Reservations: admin app read" on public.reservations;
+create policy "Reservations: admin app read"
   on public.reservations
   for select
   using (true);

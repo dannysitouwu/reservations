@@ -48,22 +48,16 @@ type ServiceRow = {
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
-  awaiting_confirmation: 'En confirmación',
-  confirmed: 'Confirmada',
-  in_progress: 'En curso',
-  fulfilled: 'Finalizada',
-  cancelled: 'Cancelada',
-  rejected: 'Rechazada'
+  paid: 'Pagado',
+  fulfilled: 'Finalizado',
+  cancelled: 'Cancelado'
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#94a3b8',
-  awaiting_confirmation: '#f59e0b',
-  confirmed: '#0ea5e9',
-  in_progress: '#6366f1',
-  fulfilled: '#22c55e',
-  cancelled: '#ef4444',
-  rejected: '#64748b'
+  pending: '#f59e0b',
+  paid: '#10b981',
+  fulfilled: '#3b82f6',
+  cancelled: '#ef4444'
 };
 
 const PIE_COLORS = ['#4338ca', '#2563eb', '#14b8a6', '#22c55e', '#f97316', '#ef4444', '#0f172a'];
@@ -179,7 +173,7 @@ export function AnalyticsPage() {
     return [
       {
         label: 'Ingresos del mes',
-        value: latestMonth ? formatCurrency(Number(latestMonth.revenue ?? 0)) : '—',
+        value: latestMonth ? formatCurrency(Number(latestMonth.revenue ?? 0) / 100) : '—',
         helper: 'Comparado con el mes anterior',
         trend: revenueTrend
       },
@@ -191,7 +185,7 @@ export function AnalyticsPage() {
       },
       {
         label: 'Ticket promedio histórico',
-        value: overview ? formatCurrency(Number(overview.average_ticket ?? 0)) : '—',
+        value: overview ? formatCurrency(Number(overview.average_ticket ?? 0) / 100) : '—',
         helper: 'Promedio en reservas confirmadas',
         trend: null
       },
@@ -210,7 +204,7 @@ export function AnalyticsPage() {
         const date = new Date(item.month_start);
         return {
           month: date.toLocaleDateString('es-CR', { month: 'short' }),
-          revenue: Number(item.revenue ?? 0),
+          revenue: Number(item.revenue ?? 0) / 100,
           reservations: Number(item.reservations ?? 0),
           fullMonth: date.toLocaleDateString('es-CR', { month: 'short', year: 'numeric' })
         };
@@ -234,9 +228,9 @@ export function AnalyticsPage() {
     () =>
       servicePerformance.map((item) => ({
         service: item.service_name,
-        revenue: Number(item.revenue ?? 0),
+        revenue: Number(item.revenue ?? 0) / 100,
         reservations: Number(item.reservations ?? 0),
-        averageTicket: Number(item.average_ticket ?? 0)
+        averageTicket: Number(item.average_ticket ?? 0) / 100
       })),
     [servicePerformance]
   );

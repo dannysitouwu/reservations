@@ -1,9 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSupabase } from '../providers/SupabaseProvider';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
+import { useSupabase } from '../providers/SupabaseProvider';
 
 export function AuthPage() {
   const { client, session } = useSupabase();

@@ -1,11 +1,8 @@
 export type ReservationStatus =
   | 'pending'
-  | 'awaiting_confirmation'
-  | 'confirmed'
-  | 'in_progress'
+  | 'paid'
   | 'fulfilled'
-  | 'cancelled'
-  | 'rejected';
+  | 'cancelled';
 
 export type Reservation = {
   id: string;

@@ -1,4 +1,4 @@
-.PHONY: install setup dev
+.PHONY: install setup dev dev-admin dev-client
 
 install:
 	npm install --prefix admin-app
@@ -8,7 +8,13 @@ setup:
 	./setup-env.sh
 
 dev:
-	# start admin on 5170 and client on 5171 (ports fixed in each app's vite.config.ts)
-	npm run dev --prefix admin-app &
-	npm run dev --prefix client-app &
-	wait
+	# start admin on 5170 only (default)
+	npm run dev --prefix admin-app
+
+dev-admin:
+	# start admin on 5170 only
+	npm run dev --prefix admin-app
+
+dev-client:
+	# start client on 5171 only
+	npm run dev --prefix client-app

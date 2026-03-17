@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Container } from '../../components/ui/Container';
 import { GradientText } from '../../components/ui/GradientText';
 import { supabase } from '../../lib/supabaseClient';

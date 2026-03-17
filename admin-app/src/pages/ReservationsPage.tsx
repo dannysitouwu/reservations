@@ -13,12 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 const statuses = [
   { value: 'all', label: 'Todos los estados' },
   { value: 'pending', label: 'Pendiente' },
-  { value: 'awaiting_confirmation', label: 'Por confirmar' },
-  { value: 'confirmed', label: 'Confirmada' },
-  { value: 'in_progress', label: 'En curso' },
-  { value: 'fulfilled', label: 'Completada' },
-  { value: 'cancelled', label: 'Cancelada' },
-  { value: 'rejected', label: 'Rechazada' }
+  { value: 'paid', label: 'Pagado' },
+  { value: 'fulfilled', label: 'Realizado' },
+  { value: 'cancelled', label: 'Cancelado' }
 ];
 
 export function ReservationsPage() {
@@ -37,6 +34,19 @@ export function ReservationsPage() {
     };
 
     fetchReservations();
+
+    // Subscribe to reservations changes for real-time updates
+    const subscription = supabase
+      .channel('reservations-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
+        // Refetch data when reservations change
+        fetchReservations();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const filteredReservations = useMemo(() => {

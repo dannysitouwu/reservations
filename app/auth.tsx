@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Picker } from '../src/components/Picker';
 import MainLayout from '../src/components/MainLayout';
+import { Picker } from '../src/components/Picker';
 import { Colors } from '../src/constants/colors';
 import { useSupabase } from '../src/providers/SupabaseProvider';
 
