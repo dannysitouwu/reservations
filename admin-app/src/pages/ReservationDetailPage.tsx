@@ -1,12 +1,12 @@
+import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, DollarSign, CheckCheck, XCircle } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
-import type { ReservationDetail } from '../types/reservation';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { formatCurrency } from '../lib/formatCurrency';
+import { supabase } from '../lib/supabaseClient';
+import type { ReservationDetail } from '../types/reservation';
 
 // Simplified state transitions
 const stateInfo: Record<string, { label: string; color: string; icon: React.ReactNode }> = {

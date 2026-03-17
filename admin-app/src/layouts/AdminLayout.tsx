@@ -1,10 +1,10 @@
-import { LayoutDashboard, CalendarClock, Users2, BarChart3, LogOut, Plus } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { BarChart3, CalendarClock, LayoutDashboard, LogOut, Plus, Users2 } from 'lucide-react';
 import { PropsWithChildren } from 'react';
-import { useSupabase } from '../providers/SupabaseProvider';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabaseClient';
+import { cn } from '../lib/utils';
+import { useSupabase } from '../providers/SupabaseProvider';
 
 const navItems = [
   { to: '/', label: 'Resumen', icon: LayoutDashboard },

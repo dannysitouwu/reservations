@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
-import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useSupabase } from '../providers/SupabaseProvider';
+import { useEffect } from 'react';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../layouts/AdminLayout';
+import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { AuthAdminPage } from '../pages/AuthAdminPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { NewServicePage } from '../pages/NewServicePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ReservationDetailPage } from '../pages/ReservationDetailPage';
 import { ReservationsPage } from '../pages/ReservationsPage';
 import { UserManagementPage } from '../pages/UserManagementPage';
-import { AnalyticsPage } from '../pages/AnalyticsPage';
-import { NewServicePage } from '../pages/NewServicePage';
+import { useSupabase } from '../providers/SupabaseProvider';
 
 function ProtectedRoutes() {
   const { session, loading } = useSupabase();

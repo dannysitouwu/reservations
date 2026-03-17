@@ -1,5 +1,5 @@
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { SupabaseClient, Session } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import type { WorkerProfile } from '../types/profile';

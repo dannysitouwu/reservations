@@ -2,11 +2,11 @@ import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { toSlug } from '../../../src/utils/slug';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
 import { supabase } from '../lib/supabaseClient';
 import { formatCurrency } from '../utils/currency';
-import { toSlug } from '../../../src/utils/slug';
 
 export type ReservationOption = {
   id: string;
