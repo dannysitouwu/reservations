@@ -36,6 +36,7 @@ export default function MyReservationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, { rating: number; comment: string }>>({});
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
+  const [hiddenReservationIds, setHiddenReservationIds] = useState<Set<string>>(new Set());
 
   const locale = useMemo(() => (i18n.language.startsWith('es') ? 'es-CR' : 'en-US'), [i18n.language]);
   const contactPreferenceOptions = useMemo(
@@ -196,7 +197,9 @@ export default function MyReservationsPage() {
           </View>
         ) : (
           <View style={styles.list}>
-            {reservations.map((r) => {
+            {reservations
+              .filter((r) => !hiddenReservationIds.has(r.id))
+              .map((r) => {
               const referenceCode = r.public_reference || r.id.slice(0, 8).toUpperCase();
               const scheduledDate = r.scheduled_for
                 ? new Date(r.scheduled_for).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })
@@ -214,7 +217,12 @@ export default function MyReservationsPage() {
                       <Text style={styles.cardRef}>{t('myReservations.reference', { code: referenceCode })}</Text>
                     </View>
                     <View style={styles.statusBadge}>
-                      <Text style={styles.statusBadgeText}>{t(`statusLabels.${r.status}` as const)}</Text>
+                      <Text style={styles.statusBadgeText}>
+                        {r.status === 'pending' && 'Pendiente'}
+                        {r.status === 'paid' && 'Pagado'}
+                        {r.status === 'fulfilled' && 'Finalizado'}
+                        {r.status === 'cancelled' && 'Cancelado'}
+                      </Text>
                     </View>
                   </View>
 
@@ -256,7 +264,7 @@ export default function MyReservationsPage() {
                         void copyReferenceCode(referenceCode);
                       }}
                     >
-                      <Text style={styles.trackBtnText}>Copiar código</Text>
+                      <Text style={styles.trackBtnText}>Copiar</Text>
                     </Pressable>
                     <Pressable
                       style={styles.trackBtn}
@@ -277,8 +285,18 @@ export default function MyReservationsPage() {
                         }
                       }}
                     >
-                      <Text style={styles.trackBtnText}>Descargar PDF</Text>
+                      <Text style={styles.trackBtnText}>PDF</Text>
                     </Pressable>
+                    {(r.status === 'fulfilled' || r.status === 'cancelled') && (
+                      <Pressable
+                        style={[styles.trackBtn, styles.deleteBtnz]}
+                        onPress={() => {
+                          setHiddenReservationIds((prev) => new Set([...prev, r.id]));
+                        }}
+                      >
+                        <Text style={styles.trackBtnText}>🗑️</Text>
+                      </Pressable>
+                    )}
                   </View>
 
                   {r.status === 'fulfilled' ? (
@@ -409,6 +427,7 @@ const styles = StyleSheet.create({
   },
   trackBtnText: { color: Colors.white80, fontSize: 12, fontWeight: '600' },
   trackBtnDisabled: { opacity: 0.6 },
+  deleteBtnz: { borderColor: '#008000' },
   feedbackBox: {
     marginTop: 12,
     borderWidth: 1,

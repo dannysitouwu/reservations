@@ -83,20 +83,32 @@ export function NewServicePage() {
 
       // Upload photo if provided
       if (form.photoFile) {
-        const fileName = `${Date.now()}-${form.photoFile.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('service-photos')
-          .upload(`services/${fileName}`, form.photoFile);
+        try {
+          const fileName = `${Date.now()}-${form.photoFile.name}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('service-photos')
+            .upload(`services/${fileName}`, form.photoFile, {
+              cacheControl: '3600',
+              upsert: false
+            });
 
-        if (uploadError) {
-          throw new Error(`Error subiendo foto: ${uploadError.message}`);
+          if (uploadError) {
+            console.error('Storage upload error:', uploadError);
+            throw new Error(
+              uploadError.message.includes('not found')
+                ? 'Bucket "service-photos" no existe. Contacta al admin.'
+                : `Error subiendo foto: ${uploadError.message}`
+            );
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('service-photos')
+            .getPublicUrl(`services/${fileName}`);
+
+          photoUrl = publicUrl;
+        } catch (photoError) {
+          throw photoError instanceof Error ? photoError : new Error('Error procesando foto');
         }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('service-photos')
-          .getPublicUrl(`services/${fileName}`);
-
-        photoUrl = publicUrl;
       }
 
       // Create service using RPC function (with authorization check)
