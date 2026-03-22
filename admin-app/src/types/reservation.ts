@@ -20,7 +20,10 @@ export type Reservation = {
 
 export type ReservationDetail = Reservation & {
   service_name: string;
+  service_option_name?: string | null;
   duration_minutes: number;
+  total_amount: number | null;
+  currency_code: string | null;
   internal_notes: string | null;
   buyer_phone: string | null;
   notes: string | null;

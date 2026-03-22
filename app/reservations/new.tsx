@@ -18,8 +18,15 @@ import { Picker } from '../../src/components/Picker';
 import { Colors } from '../../src/constants/colors';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { downloadReservationPdf } from '../../src/utils/reservationPdf';
+import { formatCurrency } from '../../src/utils/currency';
 
-type ExperienceOption = { id: string; name: string; description: string | null };
+type ExperienceOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  base_price: number;
+  currency_code: string;
+};
 type AvailabilitySlot = { weekday: number; start_time: string; end_time: string; capacity: number };
 
 function toMinutes(time: string): number {
@@ -62,7 +69,7 @@ export default function CreateReservationPage() {
   const [notes, setNotes] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [partySize, setPartySize] = useState('');
+  const [partySize, setPartySize] = useState('1');
   const [contactPreference, setContactPreference] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +79,16 @@ export default function CreateReservationPage() {
   const [bookedName, setBookedName] = useState('');
 
   const selectedExperience = options.find((o) => o.id === selectedOption);
+
+  const localeMoney = i18n.language.startsWith('es') ? 'es-CR' : 'en-US';
+  const localeDate = i18n.language.startsWith('es') ? 'es-MX' : 'en-US';
+  const estimatedTotalCents = useMemo(() => {
+    const opt = options.find((o) => o.id === selectedOption);
+    if (!opt) return 0;
+    const n = partySize.trim() ? Number(partySize) : 1;
+    const people = Number.isFinite(n) && n > 0 ? n : 1;
+    return opt.base_price * people;
+  }, [options, selectedOption, partySize]);
   const allowedWeekdays = useMemo(() => new Set(availability.map((slot) => slot.weekday)), [availability]);
   const hasAvailabilityRules = availability.length > 0;
 
@@ -141,13 +158,24 @@ export default function CreateReservationPage() {
   const selectedDateLabel = webDate
     ? webDateItems.find((d) => d.value === webDate)?.label ?? webDate
     : selectedDate
-      ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+      ? selectedDate.toLocaleDateString(localeDate, { day: '2-digit', month: 'short', year: 'numeric' })
       : '';
 
   useEffect(() => {
     const fetchOptions = async () => {
-      const { data } = await client.from('service_options_view').select('id, name, description').order('name');
-      if (data) setOptions(data as ExperienceOption[]);
+      const { data } = await client
+        .from('service_options_view')
+        .select('id, name, description, base_price, currency_code')
+        .order('name');
+      if (data) {
+        setOptions(
+          (data as ExperienceOption[]).map((row) => ({
+            ...row,
+            base_price: Number(row.base_price ?? 0),
+            currency_code: row.currency_code ?? 'USD',
+          })),
+        );
+      }
     };
     fetchOptions();
   }, [client]);
@@ -204,18 +232,18 @@ export default function CreateReservationPage() {
     if (Platform.OS === 'web' && webDate) {
       if (!webTime) {
         setSubmitting(false);
-        setError('Selecciona una hora disponible para esta experiencia.');
+        setError(t('booking.errors.selectTime'));
         return;
       }
       const weekday = new Date(`${webDate}T10:00:00`).getDay();
       if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
         setSubmitting(false);
-        setError('La fecha seleccionada no esta disponible para esta experiencia.');
+        setError(t('booking.errors.dateNotAvailable'));
         return;
       }
       if (!isTimeAllowed(weekday, webTime)) {
         setSubmitting(false);
-        setError('La hora seleccionada no esta disponible para esta experiencia.');
+        setError(t('booking.errors.timeNotAllowed'));
         return;
       }
       const d = new Date(`${webDate}T${webTime}:00`);
@@ -223,19 +251,19 @@ export default function CreateReservationPage() {
     } else if (selectedDate) {
       if (!selectedTime) {
         setSubmitting(false);
-        setError('Selecciona una hora disponible para esta experiencia.');
+        setError(t('booking.errors.selectTime'));
         return;
       }
       const weekday = selectedDate.getDay();
       const selectedHHMM = hhmmFromDate(selectedTime);
       if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
         setSubmitting(false);
-        setError('La fecha seleccionada no esta disponible para esta experiencia.');
+        setError(t('booking.errors.dateNotAvailable'));
         return;
       }
       if (!isTimeAllowed(weekday, selectedHHMM)) {
         setSubmitting(false);
-        setError('La hora seleccionada no esta disponible para esta experiencia.');
+        setError(t('booking.errors.timeNotAllowed'));
         return;
       }
       const d = new Date(selectedDate);
@@ -243,7 +271,7 @@ export default function CreateReservationPage() {
       scheduledFor = d.toISOString();
     } else {
       setSubmitting(false);
-      setError('Selecciona fecha y hora para completar la reserva.');
+      setError(t('booking.errors.dateTimeRequired'));
       return;
     }
 
@@ -255,7 +283,7 @@ export default function CreateReservationPage() {
       contact_phone: phone.trim(),
       contact_preference: contactPreference || null,
     };
-    if (parsed !== null) payload.party_size = String(parsed);
+    payload.party_size = parsed !== null ? String(parsed) : '1';
 
     const { data, error: rpcError } = await client.rpc('client_create_reservation', {
       reservation_input: payload,
@@ -302,25 +330,23 @@ export default function CreateReservationPage() {
           <View style={styles.successIconCircle}>
             <Text style={styles.successIconText}>✓</Text>
           </View>
-          <Text style={styles.successTitle}>¡Reserva confirmada!</Text>
+          <Text style={styles.successTitle}>{t('booking.flow.successTitle')}</Text>
           <Text style={styles.successDesc}>
-            Tu solicitud para <Text style={{ fontWeight: '700', color: '#fff' }}>{bookedName}</Text> ha sido registrada. Un concierge te contactará pronto.
+            {t('booking.flow.successDesc', { name: bookedName })}
           </Text>
 
           <View style={styles.trackingCard}>
-            <Text style={styles.trackingLabel}>CÓDIGO DE SEGUIMIENTO</Text>
+            <Text style={styles.trackingLabel}>{t('booking.flow.trackingLabel')}</Text>
             <Text style={styles.trackingCode}>{trackingCode}</Text>
-            <Text style={styles.trackingHint}>
-              Usa este código para consultar el estado de tu reserva en cualquier momento.
-            </Text>
+            <Text style={styles.trackingHint}>{t('booking.flow.trackingHint')}</Text>
           </View>
 
           <View style={styles.successActions}>
             <Pressable style={styles.btnPrimary} onPress={() => router.push('/reservations/mine')}>
-              <Text style={styles.btnPrimaryText}>Ver mis reservas</Text>
+              <Text style={styles.btnPrimaryText}>{t('booking.flow.viewMine')}</Text>
             </Pressable>
             <Pressable style={styles.btnOutline} onPress={() => router.push('/reservations/status')}>
-              <Text style={styles.btnOutlineText}>Rastrear reserva</Text>
+              <Text style={styles.btnOutlineText}>{t('booking.flow.trackReservation')}</Text>
             </Pressable>
             <Pressable style={styles.btnGhost} onPress={() => {
               setTrackingCode(null);
@@ -330,10 +356,10 @@ export default function CreateReservationPage() {
               setWebDate('');
               setWebTime('');
               setNotes('');
-              setPartySize('');
+              setPartySize('1');
               setContactPreference('');
             }}>
-              <Text style={styles.btnGhostText}>Hacer otra reserva</Text>
+              <Text style={styles.btnGhostText}>{t('booking.flow.bookAgain')}</Text>
             </Pressable>
             <Pressable
               style={styles.btnOutline}
@@ -345,18 +371,18 @@ export default function CreateReservationPage() {
                   phone,
                   scheduledDate: selectedDateLabel,
                   scheduledTime: webTime || (selectedTime
-                    ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                    ? selectedTime.toLocaleTimeString(localeDate, { hour: '2-digit', minute: '2-digit' })
                     : ''),
                   partySize,
                   contactPreference,
                   notes,
                 });
                 if (!printed) {
-                  Alert.alert('PDF', 'La descarga PDF por impresión está disponible en la versión web.');
+                  Alert.alert(t('booking.flow.pdfAlertTitle'), t('booking.flow.pdfWebOnly'));
                 }
               }}
             >
-              <Text style={styles.btnOutlineText}>Descargar PDF</Text>
+              <Text style={styles.btnOutlineText}>{t('booking.flow.downloadPdf')}</Text>
             </Pressable>
           </View>
         </View>
@@ -371,7 +397,7 @@ export default function CreateReservationPage() {
         {/* Header */}
         <View style={styles.headerSection}>
           <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>RESERVA EN LÍNEA</Text>
+            <Text style={styles.headerBadgeText}>{t('booking.flow.headerBadge')}</Text>
           </View>
           <Text style={styles.title}>{t('booking.title')}</Text>
           <Text style={styles.desc}>{t('booking.description')}</Text>
@@ -380,9 +406,9 @@ export default function CreateReservationPage() {
         {/* Progress steps */}
         <View style={styles.progressRow}>
           {[
-            { num: '1', label: 'Experiencia' },
-            { num: '2', label: 'Detalles' },
-            { num: '3', label: 'Confirmar' },
+            { num: '1', label: t('booking.flow.stepExperience') },
+            { num: '2', label: t('booking.flow.stepDetails') },
+            { num: '3', label: t('booking.flow.stepConfirm') },
           ].map((step, idx) => (
             <View key={step.num} style={styles.progressItem}>
               <View style={[styles.progressDot, idx === 0 && styles.progressDotActive]}>
@@ -399,7 +425,7 @@ export default function CreateReservationPage() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>01</Text>
-            <Text style={styles.sectionTitle}>¿Qué experiencia deseas?</Text>
+            <Text style={styles.sectionTitle}>{t('booking.flow.sectionExperience')}</Text>
           </View>
           <Picker
             value={selectedOption}
@@ -430,7 +456,9 @@ export default function CreateReservationPage() {
                       {t(`availability.weekday.${slot.weekday}` as const)} • {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                     </Text>
                     <View style={styles.availCapBadge}>
-                      <Text style={styles.availCapText}>{slot.capacity} cupos</Text>
+                      <Text style={styles.availCapText}>
+                        {t('booking.flow.slotsShort', { count: slot.capacity })}
+                      </Text>
                     </View>
                   </View>
                 ))
@@ -445,12 +473,12 @@ export default function CreateReservationPage() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>02</Text>
-            <Text style={styles.sectionTitle}>¿Cuándo te gustaría ir?</Text>
+            <Text style={styles.sectionTitle}>{t('booking.flow.sectionWhen')}</Text>
           </View>
 
           <View style={styles.dateTimeRow}>
             <View style={styles.dateTimeCol}>
-              <Text style={styles.label}>📅  Fecha</Text>
+              <Text style={styles.label}>📅  {t('booking.flow.dateLabel')}</Text>
               {Platform.OS === 'web' ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                   {filteredWebDateItems.slice(0, 14).map((item) => {
@@ -470,15 +498,15 @@ export default function CreateReservationPage() {
                 <Pressable style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
                   <Text style={selectedDate ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
                     {selectedDate
-                      ? selectedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
-                      : 'Seleccionar fecha'}
+                      ? selectedDate.toLocaleDateString(localeDate, { day: '2-digit', month: 'short', year: 'numeric' })
+                      : t('booking.flow.selectDate')}
                   </Text>
                 </Pressable>
               )}
             </View>
 
             <View style={styles.dateTimeCol}>
-              <Text style={styles.label}>🕐  Hora</Text>
+              <Text style={styles.label}>🕐  {t('booking.flow.timeLabel')}</Text>
               {Platform.OS === 'web' ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                   {webTimeItems.map((item) => {
@@ -498,8 +526,8 @@ export default function CreateReservationPage() {
                 <Pressable style={styles.dateBtn} onPress={() => setShowTimePicker(true)}>
                   <Text style={selectedTime ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
                     {selectedTime
-                      ? selectedTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
-                      : 'Seleccionar hora'}
+                      ? selectedTime.toLocaleTimeString(localeDate, { hour: '2-digit', minute: '2-digit', hour12: true })
+                      : t('booking.flow.selectTime')}
                   </Text>
                 </Pressable>
               )}
@@ -507,7 +535,7 @@ export default function CreateReservationPage() {
           </View>
 
           {Platform.OS === 'web' && selectedOption && webDate && webTimeItems.length === 0 ? (
-            <Text style={styles.helperText}>No hay horarios disponibles para la fecha seleccionada.</Text>
+            <Text style={styles.helperText}>{t('booking.flow.noTimesForDate')}</Text>
           ) : null}
 
           {/* Native inline pickers */}
@@ -527,7 +555,7 @@ export default function CreateReservationPage() {
               />
               {Platform.OS === 'ios' && (
                 <Pressable style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.pickerDoneBtnText}>Listo</Text>
+                  <Text style={styles.pickerDoneBtnText}>{t('booking.flow.pickerDone')}</Text>
                 </Pressable>
               )}
             </View>
@@ -548,7 +576,7 @@ export default function CreateReservationPage() {
               />
               {Platform.OS === 'ios' && (
                 <Pressable style={styles.pickerDoneBtn} onPress={() => setShowTimePicker(false)}>
-                  <Text style={styles.pickerDoneBtnText}>Listo</Text>
+                  <Text style={styles.pickerDoneBtnText}>{t('booking.flow.pickerDone')}</Text>
                 </Pressable>
               )}
             </View>
@@ -559,7 +587,7 @@ export default function CreateReservationPage() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>03</Text>
-            <Text style={styles.sectionTitle}>Información de contacto</Text>
+            <Text style={styles.sectionTitle}>{t('booking.flow.sectionContact')}</Text>
           </View>
           <View style={styles.fieldGroup}>
             <View style={styles.inputRow}>
@@ -618,7 +646,7 @@ export default function CreateReservationPage() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>04</Text>
-            <Text style={styles.sectionTitle}>¿Algo especial que debamos saber?</Text>
+            <Text style={styles.sectionTitle}>{t('booking.flow.sectionNotes')}</Text>
           </View>
           <TextInput
             style={[styles.input, styles.textarea]}
@@ -630,6 +658,20 @@ export default function CreateReservationPage() {
             placeholderTextColor={Colors.white40}
           />
         </View>
+
+        {selectedOption ? (
+          <View style={styles.totalBox}>
+            <Text style={styles.totalLabel}>{t('booking.estimatedTotal')}</Text>
+            <Text style={styles.totalValue}>
+              {formatCurrency(
+                estimatedTotalCents / 100,
+                selectedExperience?.currency_code ?? 'USD',
+                localeMoney,
+              )}
+            </Text>
+            <Text style={styles.totalHint}>{t('booking.priceHint')}</Text>
+          </View>
+        ) : null}
 
         {/* Error */}
         {error ? (
@@ -643,6 +685,8 @@ export default function CreateReservationPage() {
           style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={submitting}
+          accessibilityRole="button"
+          accessibilityLabel={t('booking.submit')}
         >
           {submitting ? (
             <ActivityIndicator color="#fff" size="small" />
@@ -654,9 +698,7 @@ export default function CreateReservationPage() {
           )}
         </Pressable>
 
-        <Text style={styles.disclaimer}>
-          Al enviar, un concierge revisará tu solicitud y te contactará para confirmar disponibilidad y coordinar detalles.
-        </Text>
+        <Text style={styles.disclaimer}>{t('booking.flow.disclaimer')}</Text>
       </View>
     </MainLayout>
   );
@@ -812,6 +854,19 @@ const styles = StyleSheet.create({
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 1.5, textTransform: 'uppercase' },
   submitArrow: { color: '#fff', fontSize: 18, fontWeight: '700' },
   disclaimer: { color: Colors.white40, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 16 },
+
+  totalBox: {
+    borderWidth: 1,
+    borderColor: Colors.white15,
+    backgroundColor: Colors.white05,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    gap: 6,
+  },
+  totalLabel: { color: Colors.white80, fontSize: 14, fontWeight: '600' },
+  totalValue: { color: Colors.primary, fontSize: 22, fontWeight: '800' },
+  totalHint: { color: Colors.white50, fontSize: 11, lineHeight: 16 },
 
   // Buttons
   btnPrimary: { backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },

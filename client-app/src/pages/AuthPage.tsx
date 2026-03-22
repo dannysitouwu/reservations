@@ -55,6 +55,11 @@ export function AuthPage() {
       return;
     }
 
+    if (!isSignIn && password.length < 8) {
+      setError(t('auth.passwordTooShort'));
+      return;
+    }
+
     setLoading(true);
 
     if (isSignIn) {
@@ -69,7 +74,16 @@ export function AuthPage() {
         setMessage(t('auth.signedIn', { email: nextSession.user.email }));
       }
     } else {
-      const { data, error: signUpError } = await client.auth.signUp({ email, password });
+      const { data, error: signUpError } = await client.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: fullName.trim(),
+            last_name: lastName.trim()
+          }
+        }
+      });
 
       if (signUpError) {
         setError(signUpError.message);

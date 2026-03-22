@@ -83,6 +83,11 @@ export default function AuthPage() {
       return;
     }
 
+    if (!isSignIn && password.length < 8) {
+      setError(t('auth.passwordTooShort'));
+      return;
+    }
+
     const phoneDigits = phone.replace(/\D/g, '');
     if (!isSignIn && phone && phoneDigits.length !== 8) {
       setError('Ingresa un teléfono válido de 8 dígitos.');
@@ -99,7 +104,16 @@ export default function AuthPage() {
         setMessage(t('auth.signedIn'));
       }
     } else {
-      const { data, error: signUpError } = await client.auth.signUp({ email, password });
+      const { data, error: signUpError } = await client.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+          },
+        },
+      });
       if (signUpError) {
         setError(signUpError.message);
       } else if (data?.session) {

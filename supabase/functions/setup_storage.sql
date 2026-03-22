@@ -1,21 +1,20 @@
--- Storage bucket setup (run manually in Supabase dashboard)
--- This is documentation for bucket creation
+-- =============================================================================
+-- Storage: bucket service-photos (Supabase Dashboard o CLI)
+-- =============================================================================
+-- 1) Crea el bucket en Dashboard → Storage → New bucket
+--    - Name: service-photos
+--    - Public bucket: ON (para URLs públicas en la app)
+-- 2) Recomendado en el mismo modal:
+--    - Restrict file size: ON (ej. 5 MB)
+--    - Restrict MIME types: ON → image/jpeg, image/png, image/webp
+-- 3) Aplica la migración 0038 (supabase db push): políticas en storage.objects
+--    sin ALTER TABLE (en hosted Supabase no eres owner de storage.objects).
+--
+-- Si la subida falla con "new row violates row-level security policy",
+-- ejecuta 0038 o revisa que tu usuario tenga role admin/super_admin en profiles.
+-- =============================================================================
 
-/*
-INSERT INTO storage.buckets (id, name, public, created_at, updated_at, owner, owner_id, avif_autodetection, file_size_limit, allowed_mime_types)
-VALUES (
-  'service-photos',
-  'service-photos',
-  true,
-  now(),
-  now(),
-  'authenticated',
-  NULL,
-  false,
-  5242880,  -- 5MB limit
-  ARRAY['image/jpeg', 'image/png', 'image/webp']
-);
-*/
-
--- Note: This must be created in Supabase dashboard or via CLI
--- CLI: supabase storage create service-photos --public
+-- Opcional: crear bucket por SQL (puede requerir permisos de superuser en local)
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('service-photos', 'service-photos', true)
+-- ON CONFLICT (id) DO NOTHING;

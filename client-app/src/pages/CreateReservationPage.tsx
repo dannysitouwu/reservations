@@ -6,11 +6,14 @@ import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
 import { useSupabase } from '../providers/SupabaseProvider';
 import { downloadReservationPdf } from '../utils/reservationPdf';
+import { formatCurrency } from '../utils/currency';
 
 type ExperienceOption = {
   id: string;
   name: string;
   description: string | null;
+  base_price: number;
+  currency_code: string;
 };
 
 type AvailabilitySlot = {
@@ -22,7 +25,7 @@ type AvailabilitySlot = {
 
 export function CreateReservationPage() {
   const { client, session } = useSupabase();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
   const [options, setOptions] = useState<ExperienceOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('');
@@ -31,7 +34,7 @@ export function CreateReservationPage() {
   const [notes, setNotes] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [partySize, setPartySize] = useState('');
+  const [partySize, setPartySize] = useState('1');
   const [contactPreference, setContactPreference] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +46,17 @@ export function CreateReservationPage() {
     const fetchOptions = async () => {
       const { data, error: fetchError } = await client
         .from('service_options_view')
-        .select('id, name, description')
+        .select('id, name, description, base_price, currency_code')
         .order('name');
 
       if (!fetchError && data) {
-        setOptions(data as ExperienceOption[]);
+        setOptions(
+          (data as ExperienceOption[]).map((row) => ({
+            ...row,
+            base_price: Number(row.base_price ?? 0),
+            currency_code: row.currency_code ?? 'USD'
+          }))
+        );
       }
     };
 
@@ -162,7 +171,7 @@ export function CreateReservationPage() {
     });
 
     if (rpcError) {
-      setError(t('booking.errors.generic'));
+      setError(rpcError.message || (t('booking.errors.generic') as string));
     } else if (data?.reservation_id) {
       const { data: reservationData } = await client
         .from('reservations')
@@ -176,6 +185,16 @@ export function CreateReservationPage() {
 
     setSubmitting(false);
   };
+
+  const locale = i18n.language.startsWith('es') ? 'es-CR' : 'en-US';
+
+  const estimatedTotalCents = useMemo(() => {
+    const opt = options.find((o) => o.id === selectedOption);
+    if (!opt) return 0;
+    const n = partySize.trim() ? Number(partySize) : 1;
+    const people = Number.isFinite(n) && n > 0 ? n : 1;
+    return opt.base_price * people;
+  }, [options, selectedOption, partySize]);
 
   const availabilityList = useMemo(() => {
     if (!selectedOption || loadingAvailability) {
@@ -387,6 +406,20 @@ export function CreateReservationPage() {
               className="mt-2 w-full rounded-2xl border border-white/20 bg-brand-background/60 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-brand-accent/60"
             />
           </div>
+
+          {selectedOption ? (
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-4 text-sm text-white/80">
+              <p className="font-semibold text-white">{t('booking.estimatedTotal')}</p>
+              <p className="mt-1 text-lg text-brand-primary">
+                {formatCurrency(
+                  estimatedTotalCents / 100,
+                  options.find((o) => o.id === selectedOption)?.currency_code ?? 'USD',
+                  locale
+                )}
+              </p>
+              <p className="mt-1 text-xs text-white/50">{t('booking.priceHint')}</p>
+            </div>
+          ) : null}
 
           <button
             type="submit"

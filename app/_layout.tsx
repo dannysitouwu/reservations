@@ -41,6 +41,7 @@ export default function RootLayout() {
         <Stack.Screen name="reservations/options" />
         <Stack.Screen name="reservations/status" />
         <Stack.Screen name="reservations/mine" />
+        <Stack.Screen name="experiences/[id]" />
       </Stack>
       <StatusBar style="light" />
     </SupabaseProvider>

@@ -8,12 +8,14 @@ import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 const roleBadges: Record<WorkerProfile['role'], string> = {
+  super_admin: 'bg-violet-100 text-violet-800',
   admin: 'bg-amber-100 text-amber-700',
   worker: 'bg-blue-100 text-blue-700',
   buyer: 'bg-slate-200 text-slate-700'
 };
 
 const roleLabels: Record<WorkerProfile['role'], string> = {
+  super_admin: 'Super admin',
   admin: 'Administrador',
   worker: 'Operador',
   buyer: 'Cliente'
@@ -100,7 +102,10 @@ export function UserManagementPage() {
           <div className="flex flex-wrap gap-3 text-xs text-slate-500">
             <Badge variant="outline">{users.length} usuarios en total</Badge>
             <Badge variant="outline">{users.filter((user) => user.role === 'worker').length} operadores</Badge>
-            <Badge variant="outline">{users.filter((user) => user.role === 'admin').length} administradores</Badge>
+            <Badge variant="outline">
+              {users.filter((user) => user.role === 'admin' || user.role === 'super_admin').length}{' '}
+              administradores
+            </Badge>
           </div>
         </CardContent>
       </Card>

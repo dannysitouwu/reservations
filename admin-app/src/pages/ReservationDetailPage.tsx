@@ -1,5 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { useParams } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -37,6 +39,9 @@ export function ReservationDetailPage() {
   const [error, setError] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('sinpe');
+  const [externalRef, setExternalRef] = useState('');
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   useEffect(() => {
     const fetchReservation = async () => {
@@ -55,6 +60,9 @@ export function ReservationDetailPage() {
             internal_notes,
             buyer_id,
             service_option_id,
+            metadata,
+            created_at,
+            updated_at,
             profiles:buyer_id (email, full_name, phone),
             service_options:service_option_id (
               name,
@@ -70,25 +78,45 @@ export function ReservationDetailPage() {
         if (err) throw err;
 
         if (res) {
-          // Transform the data to match expected format
-          const transformed = {
-            id: res.id,
-            public_reference: res.public_reference,
-            status: res.status as any,
-            scheduled_for: res.scheduled_for,
-            total_amount: res.total_amount,
-            currency_code: res.currency_code,
-            notes: res.notes,
-            internal_notes: res.internal_notes,
-            buyer_name: (res.profiles as any)?.full_name,
-            buyer_email: (res.profiles as any)?.email,
-            buyer_phone: (res.profiles as any)?.phone,
-            service_name: (res.service_options?.services as any)?.name,
-            service_option_name: res.service_options?.name,
-            duration_minutes: res.service_options?.duration_minutes,
-            party_size: 1
+          const row = res as Record<string, unknown>;
+          const meta = (row.metadata as Record<string, unknown> | null) ?? {};
+          const ps = meta.party_size;
+          const partySize =
+            typeof ps === 'number' ? ps : typeof ps === 'string' ? parseInt(ps, 10) || 1 : 1;
+          const so = row.service_options as
+            | {
+                name?: string;
+                duration_minutes?: number;
+                services?: { name?: string } | { name?: string }[];
+              }
+            | null
+            | undefined;
+          const svc = so?.services;
+          const serviceCategoryName = Array.isArray(svc) ? svc[0]?.name : svc?.name;
+          const transformed: ReservationDetail = {
+            id: row.id as string,
+            public_reference: row.public_reference as string,
+            status: row.status as ReservationDetail['status'],
+            scheduled_for: (row.scheduled_for as string | null) ?? null,
+            buyer_id: row.buyer_id as string,
+            buyer_email: (row.profiles as { email?: string } | null)?.email ?? null,
+            buyer_name: (row.profiles as { full_name?: string } | null)?.full_name ?? null,
+            assigned_worker_id: null,
+            assigned_worker_name: null,
+            created_at: (row.created_at as string) ?? '',
+            updated_at: (row.updated_at as string) ?? '',
+            service_name: serviceCategoryName ?? '',
+            service_option_name: so?.name ?? null,
+            duration_minutes: so?.duration_minutes ?? 0,
+            total_amount: (row.total_amount as number | null) ?? null,
+            currency_code: (row.currency_code as string | null) ?? null,
+            notes: (row.notes as string | null) ?? null,
+            internal_notes: (row.internal_notes as string | null) ?? null,
+            buyer_phone: (row.profiles as { phone?: string } | null)?.phone ?? null,
+            contact_preference: null,
+            party_size: partySize
           };
-          setReservation(transformed as any);
+          setReservation(transformed);
           setInternalNotes(res.internal_notes || '');
         }
       } catch (err) {
@@ -98,26 +126,49 @@ export function ReservationDetailPage() {
       setLoading(false);
     };
 
-    if (id) {
-      fetchReservation();
-      const subscription = supabase
-        .channel(`reservation-${id}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'reservations', filter: `id=eq.${id}` },
-          () => fetchReservation()
-        )
-        .subscribe();
-
-      return () => subscription.unsubscribe();
+    if (!id) {
+      setLoading(false);
+      return undefined;
     }
+
+    void fetchReservation();
+    const channel = supabase
+      .channel(`reservation-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations', filter: `id=eq.${id}` },
+        () => {
+          void fetchReservation();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!id || !reservation) return;
+    if (newStatus === 'cancelled') {
+      const ok = window.confirm(
+        '¿Cancelar esta reserva? El cliente verá el estado como cancelado.'
+      );
+      if (!ok) return;
+    }
+    if (newStatus === 'paid') {
+      const ok = window.confirm(
+        '¿Marcar esta reserva como pagada? Si registras el cobro con comprobante, usa el formulario “Registrar pago” debajo.'
+      );
+      if (!ok) return;
+    }
+    if (newStatus === 'fulfilled') {
+      const ok = window.confirm('¿Marcar esta reserva como realizada?');
+      if (!ok) return;
+    }
     setUpdating(true);
     try {
-      const { error: err } = await supabase.rpc('admin_update_reservation_status', {
+      const { data, error: err } = await supabase.rpc('admin_update_reservation_status', {
         reservation_id: id,
         next_status: newStatus
       });
@@ -125,13 +176,56 @@ export function ReservationDetailPage() {
       if (err) {
         setError(`Error: ${err.message}`);
       } else {
-        setReservation({ ...reservation, status: newStatus as any });
-        setError('');
+        const payload = data as { success?: boolean; error?: string } | null;
+        if (payload && payload.success === false) {
+          setError(payload.error ?? 'No se pudo actualizar el estado');
+        } else {
+          setReservation({ ...reservation, status: newStatus as any });
+          setError('');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!id || !reservation || reservation.status !== 'pending') return;
+    const cents = reservation.total_amount ?? 0;
+    if (!cents) {
+      setError('La reserva no tiene monto total definido');
+      return;
+    }
+    const ok = window.confirm(
+      '¿Confirmar el pago y marcar la reserva como pagada? Se registrará el movimiento en pagos.'
+    );
+    if (!ok) return;
+    setRecordingPayment(true);
+    setError('');
+    try {
+      const { data, error: err } = await supabase.rpc('admin_record_payment', {
+        p_reservation_id: id,
+        amount_cents: cents,
+        payment_method: paymentMethod,
+        external_reference: externalRef.trim() || null
+      });
+      if (err) {
+        setError(err.message);
+      } else {
+        const payload = data as { success?: boolean; error?: string } | null;
+        if (payload && payload.success === false) {
+          setError(payload.error ?? 'No se pudo registrar el pago');
+        } else {
+          setReservation({ ...reservation, status: 'paid' as any });
+          setExternalRef('');
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al registrar pago');
+    } finally {
+      setRecordingPayment(false);
     }
   };
 
@@ -201,6 +295,49 @@ export function ReservationDetailPage() {
       ) : (
         <div className="text-sm text-slate-500">✓ Estado final - no se puede cambiar</div>
       )}
+
+      {reservation.status === 'pending' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Registrar pago (SINPE / efectivo)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 max-w-md">
+            <div>
+              <Label htmlFor="pay_method">Método</Label>
+              <select
+                id="pay_method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="sinpe">SINPE móvil / transferencia</option>
+                <option value="cash">Efectivo</option>
+                <option value="card">Tarjeta (manual)</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="pay_ref">Referencia externa (opcional)</Label>
+              <Input
+                id="pay_ref"
+                value={externalRef}
+                onChange={(e) => setExternalRef(e.target.value)}
+                placeholder="Número de comprobante"
+                disabled={recordingPayment}
+              />
+            </div>
+            <Button
+              onClick={() => void handleRecordPayment()}
+              disabled={recordingPayment || updating}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {recordingPayment ? 'Registrando…' : 'Confirmar pago y marcar como pagada'}
+            </Button>
+            <p className="text-xs text-slate-500">
+              Se guarda el movimiento en <code className="text-xs">reservation_payments</code> y se encola notificación al cliente.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -281,7 +418,7 @@ export function ReservationDetailPage() {
                 <Button
                   onClick={() => setEditingNotes(false)}
                   disabled={updating}
-                  variant="outline"
+                  variant="secondary"
                 >
                   Cancelar
                 </Button>
@@ -292,7 +429,7 @@ export function ReservationDetailPage() {
               <p className="text-sm text-slate-600 whitespace-pre-wrap">{internalNotes || '(Sin notas)'}</p>
               <Button
                 onClick={() => setEditingNotes(true)}
-                variant="outline"
+                variant="secondary"
                 className="mt-2"
                 size="sm"
               >

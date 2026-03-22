@@ -67,7 +67,7 @@ export function AuthAdminPage() {
           return;
         }
 
-        if (profile.role !== 'admin') {
+        if (profile.role !== 'admin' && profile.role !== 'super_admin') {
           await supabase.auth.signOut();
           setError('Solo administradores pueden acceder a este panel');
           setLoading(false);

@@ -149,7 +149,7 @@ export function DashboardPage() {
                 <Button onClick={handleSaveBriefing} className="flex-1 bg-primary text-white hover:bg-primary/90">
                   Guardar
                 </Button>
-                <Button onClick={() => setShowBriefingModal(false)} variant="outline" className="flex-1">
+                <Button onClick={() => setShowBriefingModal(false)} variant="secondary" className="flex-1">
                   Cancelar
                 </Button>
               </div>

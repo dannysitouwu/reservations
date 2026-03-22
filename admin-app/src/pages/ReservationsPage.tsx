@@ -35,17 +35,15 @@ export function ReservationsPage() {
 
     fetchReservations();
 
-    // Subscribe to reservations changes for real-time updates
-    const subscription = supabase
+    const channel = supabase
       .channel('reservations-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
-        // Refetch data when reservations change
-        fetchReservations();
+        void fetchReservations();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      void supabase.removeChannel(channel);
     };
   }, []);
 
@@ -110,7 +108,7 @@ export function ReservationsPage() {
           <Badge variant="outline">{filteredReservations.length} resultados</Badge>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <Table>
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Código</TableHead>

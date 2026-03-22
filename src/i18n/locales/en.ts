@@ -156,11 +156,47 @@ const translation = {
       noOption: 'Select an experience to continue.',
       missingContact: 'Add your name and phone so we can reach you.',
       invalidPartySize: 'Group size must be a number greater than zero.',
-      generic: 'We could not save your reservation.'
+      generic: 'We could not save your reservation.',
+      selectTime: 'Choose an available time for this experience.',
+      dateNotAvailable: 'The selected date is not available for this experience.',
+      timeNotAllowed: 'The selected time is not available for this experience.',
+      dateTimeRequired: 'Select a date and time to complete your reservation.'
+    },
+    flow: {
+      headerBadge: 'ONLINE BOOKING',
+      stepExperience: 'Experience',
+      stepDetails: 'Details',
+      stepConfirm: 'Confirm',
+      sectionExperience: 'Which experience would you like?',
+      sectionWhen: 'When would you like to go?',
+      sectionContact: 'Contact information',
+      sectionNotes: 'Anything special we should know?',
+      dateLabel: 'Date',
+      timeLabel: 'Time',
+      selectDate: 'Select date',
+      selectTime: 'Select time',
+      pickerDone: 'Done',
+      noTimesForDate: 'No time slots are available for the selected date.',
+      successTitle: 'Reservation confirmed!',
+      successDesc:
+        'Your request for {{name}} has been recorded. A concierge will contact you soon.',
+      trackingLabel: 'TRACKING CODE',
+      trackingHint: 'Use this code to check your reservation status anytime.',
+      viewMine: 'View my reservations',
+      trackReservation: 'Track reservation',
+      bookAgain: 'Book another',
+      downloadPdf: 'Download PDF',
+      pdfAlertTitle: 'PDF',
+      pdfWebOnly: 'Print-to-PDF download is available on the web version.',
+      disclaimer:
+        'After you submit, a concierge will review your request and contact you to confirm availability and details.',
+      slotsShort: '{{count}} spots'
     },
     availabilityTitle: 'Suggested availability',
     availabilityEmpty: 'Select an experience to view recommended times.',
-    availabilityNone: 'Coordinate with your concierge for custom availability.'
+    availabilityNone: 'Coordinate with your concierge for custom availability.',
+    estimatedTotal: 'Estimated total',
+    priceHint: 'Base price per guest × party size. Confirmed when paid.'
   },
   availability: {
     weekday: {
@@ -176,6 +212,7 @@ const translation = {
   },
   statusLabels: {
     pending: 'Pending',
+    paid: 'Paid',
     awaiting_confirmation: 'Awaiting confirmation',
     confirmed: 'Confirmed',
     in_progress: 'In progress',
@@ -190,7 +227,44 @@ const translation = {
       'Explore tailored adventures from the Caribbean to the Pacific. Every option includes bilingual guides and safe transport.',
     curatedTag: 'Curated',
     badges: ['Adventure', 'Nature', 'Wellness'],
-    loading: 'Loading tropical experiences…'
+    loading: 'Loading tropical experiences…',
+    searchLabel: 'Search',
+    searchPlaceholder: 'Name or keyword',
+    locationLabel: 'Location',
+    locationPlaceholder: 'e.g. Costa Rica',
+    categoryLabel: 'Category',
+    categoryPlaceholder: 'e.g. Adventure',
+    sortLabel: 'Sort',
+    sortRelevance: 'Relevance',
+    sortPriceAsc: 'Price ↑',
+    sortPriceDesc: 'Price ↓',
+    sortRating: 'Top rated',
+    applyFilters: 'Apply filters',
+    empty: 'No matches. Try different filters.',
+    durationLabel: 'Duration',
+    fromPriceLabel: 'From',
+    viewDetail: 'View details',
+    reviewsShort: 'Reviews',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    pageIndicator: 'Page {{page}}',
+    bookNow: 'Book now'
+  },
+  experience: {
+    loadError: 'We could not load this experience.',
+    notFound: 'Experience not available.',
+    backToCatalog: 'Back to catalog',
+    from: 'From',
+    duration: '{{minutes}} min',
+    about: 'About',
+    rating: 'Rating',
+    ratingValue: '{{avg}} / 5 ({{count}} reviews)',
+    noReviews: 'No reviews yet',
+    availabilityTitle: 'Availability',
+    availabilityEmpty: 'Ask concierge for other dates.',
+    reviewsTitle: 'Reviews',
+    noReviewsYet: 'No reviews yet.',
+    reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Track your reservation',
@@ -236,7 +310,8 @@ const translation = {
     createAccount: 'Create account',
     signInHere: 'Sign in here',
     passwordMismatch: 'Passwords do not match.',
-    checkEmail: 'Check {{email}} to confirm your account before signing in.'
+    checkEmail: 'Check {{email}} to confirm your account before signing in.',
+    passwordTooShort: 'Password must be at least 8 characters.'
   },
   notFound: {
     title: 'We could not find this page',
@@ -268,7 +343,23 @@ const translation = {
     notes: 'Traveler notes',
     notesEmpty: 'No notes were provided.',
     unscheduled: 'To be confirmed',
-    unnamedExperience: 'Costa Rica experience'
+    unnamedExperience: 'Costa Rica experience',
+    totalLabel: 'Total',
+    cancel: 'Cancel reservation',
+    cancelling: 'Cancelling…',
+    cancelError: 'Could not cancel this reservation.',
+    trackStatus: 'View status',
+    copyCode: 'Copy',
+    pdf: 'PDF',
+    copySuccessTitle: 'Code copied',
+    referenceAlertTitle: 'Reference code',
+    feedbackTitle: 'Rate your experience',
+    starsCount: '{{count}} stars',
+    commentPlaceholder: 'Optional comment',
+    saveFeedback: 'Save review',
+    savingFeedback: 'Saving…',
+    feedbackPending: 'You can review this reservation once it is marked completed.',
+    feedbackSaveError: 'We could not save your review.'
   },
   contact: {
     title: 'Talk to an expert',

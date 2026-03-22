@@ -166,7 +166,9 @@ const translation = {
     },
     availabilityTitle: 'Suggested availability',
     availabilityEmpty: 'Select an experience to view recommended times.',
-    availabilityNone: 'Coordinate with your concierge for custom availability.'
+    availabilityNone: 'Coordinate with your concierge for custom availability.',
+    estimatedTotal: 'Estimated total',
+    priceHint: 'Base price per guest × party size. Confirmed when paid.'
   },
   availability: {
     weekday: {
@@ -182,6 +184,7 @@ const translation = {
   },
   statusLabels: {
     pending: 'Pending',
+    paid: 'Paid',
     awaiting_confirmation: 'Awaiting confirmation',
     confirmed: 'Confirmed',
     in_progress: 'In progress',
@@ -197,7 +200,42 @@ const translation = {
     curatedTag: 'Curated',
     badges: ['Adventure', 'Nature', 'Wellness'],
     bookNow: 'Book now',
-    loading: 'Loading tropical experiences…'
+    loading: 'Loading tropical experiences…',
+    searchLabel: 'Search',
+    searchPlaceholder: 'Name or keyword',
+    locationLabel: 'Location',
+    locationPlaceholder: 'e.g. Costa Rica, Guanacaste',
+    categoryLabel: 'Category',
+    categoryPlaceholder: 'e.g. Adventure, culture',
+    sortLabel: 'Sort by',
+    sortRelevance: 'Relevance (reviews)',
+    sortPriceAsc: 'Price: low to high',
+    sortPriceDesc: 'Price: high to low',
+    sortRating: 'Highest rating',
+    applyFilters: 'Apply filters',
+    empty: 'No experiences match these filters. Try broadening your search.',
+    viewDetail: 'View details',
+    reviewsShort: 'Reviews',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    pageIndicator: 'Page {{page}}'
+  },
+  experience: {
+    loadError: 'We could not load this experience.',
+    notFound: 'Experience not available.',
+    backToCatalog: 'Back to catalog',
+    from: 'From',
+    duration: '{{minutes}} minutes',
+    about: 'About',
+    location: 'Location',
+    rating: 'Rating',
+    ratingValue: '{{avg}} / 5 ({{count}} reviews)',
+    noReviews: 'No reviews yet',
+    availabilityTitle: 'Published availability',
+    availabilityEmpty: 'Ask concierge for special dates.',
+    reviewsTitle: 'Traveler reviews',
+    noReviewsYet: 'Be the first to try this experience.',
+    reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Track your reservation',
@@ -250,7 +288,8 @@ const translation = {
     savingProfile: 'Saving profile…',
     profileSaved: 'Profile updated successfully.',
     passwordMismatch: 'Passwords do not match.',
-    checkEmail: 'Check {{email}} to confirm your account before signing in.'
+    checkEmail: 'Check {{email}} to confirm your account before signing in.',
+    passwordTooShort: 'Password must be at least 8 characters.'
   },
   notFound: {
     title: 'We could not find this page',
@@ -290,7 +329,11 @@ const translation = {
     notes: 'Traveler notes',
     notesEmpty: 'No notes were provided.',
     unscheduled: 'To be confirmed',
-    unnamedExperience: 'Costa Rica experience'
+    unnamedExperience: 'Costa Rica experience',
+    totalLabel: 'Total',
+    cancel: 'Cancel reservation',
+    cancelling: 'Cancelling…',
+    cancelError: 'Could not cancel this reservation.'
   },
   contact: {
     title: 'Talk to an expert',

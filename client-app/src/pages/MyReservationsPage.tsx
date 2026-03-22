@@ -6,6 +6,7 @@ import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
 import { useSupabase } from '../providers/SupabaseProvider';
 import { downloadReservationPdf } from '../utils/reservationPdf';
+import { formatCurrency } from '../utils/currency';
 
 type ReservationDetail = {
   id: string;
@@ -18,6 +19,8 @@ type ReservationDetail = {
   duration_minutes: number;
   contact_preference: string | null;
   party_size: number | null;
+  total_amount: number | null;
+  currency_code: string | null;
 };
 
 export function MyReservationsPage() {
@@ -28,6 +31,7 @@ export function MyReservationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedbackByReservation, setFeedbackByReservation] = useState<Record<string, { rating: number; comment: string }>>({});
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const locale = useMemo(() => (i18n.language.startsWith('es') ? 'es-CR' : 'en-US'), [i18n.language]);
   const contactPreferenceOptions = useMemo(
@@ -118,6 +122,28 @@ export function MyReservationsPage() {
         comment: field === 'comment' ? value : prev[reservationId]?.comment ?? ''
       }
     }));
+  };
+
+  const cancelReservation = async (reservationId: string) => {
+    if (!session?.user) return;
+    setCancellingId(reservationId);
+    setError(null);
+    const { data, error: rpcError } = await client.rpc('client_cancel_reservation', {
+      reservation_id: reservationId
+    });
+    setCancellingId(null);
+    if (rpcError) {
+      setError(rpcError.message || t('myReservations.cancelError'));
+      return;
+    }
+    const payload = data as { success?: boolean; error?: string } | null;
+    if (payload && payload.success === false) {
+      setError(payload.error ?? t('myReservations.cancelError'));
+      return;
+    }
+    setReservations((prev) =>
+      prev.map((r) => (r.id === reservationId ? { ...r, status: 'cancelled' } : r))
+    );
   };
 
   const submitFeedback = async (reservationId: string) => {
@@ -229,6 +255,18 @@ export function MyReservationsPage() {
                       <p className="font-semibold text-white/80">{t('myReservations.contactPreference')}</p>
                       <p className="mt-1">{contactPreferenceLabel}</p>
                     </div>
+                    <div>
+                      <p className="font-semibold text-white/80">{t('myReservations.totalLabel')}</p>
+                      <p className="mt-1">
+                        {reservation.total_amount != null
+                          ? formatCurrency(
+                              reservation.total_amount / 100,
+                              reservation.currency_code ?? 'USD',
+                              locale
+                            )
+                          : '—'}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-white/70">
@@ -269,6 +307,16 @@ export function MyReservationsPage() {
                     >
                       {t('myReservations.downloadPdf')}
                     </button>
+                    {(reservation.status === 'pending' || reservation.status === 'paid') ? (
+                      <button
+                        type="button"
+                        disabled={cancellingId === reservation.id}
+                        onClick={() => cancelReservation(reservation.id)}
+                        className="btn btn-ghost border-rose-300/40 text-rose-200"
+                      >
+                        {cancellingId === reservation.id ? t('myReservations.cancelling') : t('myReservations.cancel')}
+                      </button>
+                    ) : null}
                   </div>
 
                   {reservation.status === 'fulfilled' ? (

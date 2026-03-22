@@ -58,11 +58,7 @@ export function SupabaseProvider({ children }: PropsWithChildren) {
         console.error('Error loading profile:', error);
         // Don't sign out on error - just continue with null profile
       } else if (data) {
-        console.log('Profile loaded:', data);
         setProfile(data as WorkerProfile);
-      } else {
-        console.warn('Profile not found for user:', userId);
-        // Don't sign out - profile might not exist yet
       }
     } catch (error) {
       console.error('Unexpected error loading profile:', error);

@@ -30,13 +30,27 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files (never commit secrets)
+.env
+.env.*
+!.env.example
+!.env*.example
 
 # typescript
 *.tsbuildinfo
 
 app-example
+
+# Python
+venv/
+.venv/
+__pycache__/
+
+# Supabase CLI cache
+supabase/.temp/
+
+# Volcado monolítico generado (ver supabase/scripts/concat-migrations.sh)
+supabase/SETUP_DATABASE.full.generated.sql
 
 # generated native folders
 /ios

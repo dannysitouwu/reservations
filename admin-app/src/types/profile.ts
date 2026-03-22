@@ -3,5 +3,5 @@ export type WorkerProfile = {
   email: string;
   full_name: string | null;
   phone: string | null;
-  role: 'buyer' | 'worker' | 'admin';
+  role: 'buyer' | 'worker' | 'admin' | 'super_admin';
 };

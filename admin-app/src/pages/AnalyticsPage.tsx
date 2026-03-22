@@ -1,4 +1,3 @@
-import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Bar,
@@ -246,9 +245,48 @@ export function AnalyticsPage() {
 
   if (loading) {
     return (
-      <section className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-slate-500">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <p>Cargando analíticas operativas…</p>
+      <section className="space-y-6" aria-busy="true" aria-label="Cargando analíticas">
+        <div className="h-8 w-48 animate-pulse rounded-md bg-slate-200" />
+        <p className="text-sm text-slate-500">Cargando analíticas operativas…</p>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i} className="border-surface-border">
+              <CardHeader>
+                <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="h-8 w-36 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="border-surface-border">
+            <CardHeader>
+              <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+            </CardHeader>
+            <CardContent className="h-[320px]">
+              <div className="h-full w-full animate-pulse rounded-lg bg-slate-100" />
+            </CardContent>
+          </Card>
+          <Card className="border-surface-border">
+            <CardHeader>
+              <div className="h-5 w-44 animate-pulse rounded bg-slate-200" />
+            </CardHeader>
+            <CardContent className="h-[320px]">
+              <div className="h-full w-full animate-pulse rounded-lg bg-slate-100" />
+            </CardContent>
+          </Card>
+        </div>
+        <Card className="border-surface-border">
+          <CardHeader>
+            <div className="h-5 w-56 animate-pulse rounded bg-slate-200" />
+          </CardHeader>
+          <CardContent className="h-[360px]">
+            <div className="h-full w-full animate-pulse rounded-lg bg-slate-100" />
+          </CardContent>
+        </Card>
       </section>
     );
   }

@@ -1,12 +1,24 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import MainLayout from '../../src/components/MainLayout';
 import { Picker } from '../../src/components/Picker';
 import { Colors } from '../../src/constants/colors';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { downloadReservationPdf } from '../../src/utils/reservationPdf';
+import { formatCurrency } from '../../src/utils/currency';
 
 type ReservationDetail = {
   id: string;
@@ -19,6 +31,8 @@ type ReservationDetail = {
   duration_minutes: number;
   contact_preference: string | null;
   party_size: number | null;
+  total_amount: number | null;
+  currency_code: string | null;
 };
 
 type FeedbackRow = {
@@ -33,10 +47,12 @@ export default function MyReservationsPage() {
   const router = useRouter();
   const [reservations, setReservations] = useState<ReservationDetail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, { rating: number; comment: string }>>({});
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
   const [hiddenReservationIds, setHiddenReservationIds] = useState<Set<string>>(new Set());
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const locale = useMemo(() => (i18n.language.startsWith('es') ? 'es-CR' : 'en-US'), [i18n.language]);
   const contactPreferenceOptions = useMemo(
@@ -48,15 +64,16 @@ export default function MyReservationsPage() {
     [t],
   );
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchReservations = async () => {
+  const fetchReservations = useCallback(
+    async (opts?: { silent?: boolean }) => {
       if (!session?.user) {
-        setLoading(false);
+        if (!opts?.silent) setLoading(false);
         return;
       }
-      setLoading(true);
-      setError(null);
+      if (!opts?.silent) {
+        setLoading(true);
+        setError(null);
+      }
 
       const { data, error: fetchError } = await client
         .from('reservations_detail_view')
@@ -68,8 +85,6 @@ export default function MyReservationsPage() {
         .from('reservation_feedback')
         .select('reservation_id, rating, comment')
         .eq('buyer_id', session.user.id);
-
-      if (!isMounted) return;
 
       if (fetchError) {
         setError(t('myReservations.error'));
@@ -85,12 +100,25 @@ export default function MyReservationsPage() {
         });
         setFeedback(nextFeedback);
       }
-      setLoading(false);
-    };
-    void fetchReservations();
+      if (!opts?.silent) setLoading(false);
+    },
+    [client, session?.user, t],
+  );
 
-    // Subscribe to real-time changes on reservations
-    const subscription = client
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      await fetchReservations();
+    })();
+
+    const userId = session?.user?.id;
+    if (!userId) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const channel = client
       .channel('my-reservations')
       .on(
         'postgres_changes',
@@ -98,21 +126,53 @@ export default function MyReservationsPage() {
           event: '*',
           schema: 'public',
           table: 'reservations',
-          filter: `buyer_id=eq.${session?.user?.id}`,
+          filter: `buyer_id=eq.${userId}`,
         },
         () => {
           if (isMounted) {
-            void fetchReservations();
+            void fetchReservations({ silent: true });
           }
-        }
-      )
-      .subscribe();
+        },
+      );
+    channel.subscribe();
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      void client.removeChannel(channel);
     };
-  }, [client, session?.user, t]);
+  }, [client, session?.user?.id, fetchReservations]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchReservations({ silent: true });
+    setRefreshing(false);
+  }, [fetchReservations]);
+
+  const cancelReservation = async (reservationId: string) => {
+    if (!session?.user) return;
+    setCancellingId(reservationId);
+    setError(null);
+    const { data, error: rpcError } = await client.rpc('client_cancel_reservation', {
+      reservation_id: reservationId,
+    });
+    setCancellingId(null);
+    if (rpcError) {
+      setError(rpcError.message || (t('myReservations.cancelError') as string));
+      return;
+    }
+    const payload = data as { success?: boolean; error?: string } | null;
+    if (payload && payload.success === false) {
+      setError(payload.error ?? (t('myReservations.cancelError') as string));
+      return;
+    }
+    setReservations((prev) => prev.map((r) => (r.id === reservationId ? { ...r, status: 'cancelled' } : r)));
+  };
+
+  const statusLabel = (status: string) => {
+    const key = `statusLabels.${status}` as const;
+    const translated = t(key);
+    return translated === key ? status : translated;
+  };
 
   const updateFeedbackField = (reservationId: string, field: 'rating' | 'comment', value: string) => {
     setFeedback((prev) => ({
@@ -140,7 +200,7 @@ export default function MyReservationsPage() {
         { onConflict: 'reservation_id' },
       );
     if (saveError) {
-      setError('No se pudo guardar la evaluación.');
+      setError(t('myReservations.feedbackSaveError'));
     }
     setSavingFeedbackId(null);
   };
@@ -149,13 +209,13 @@ export default function MyReservationsPage() {
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(code);
-        Alert.alert('Codigo copiado', code);
+        Alert.alert(t('myReservations.copySuccessTitle'), code);
         return;
       }
     } catch {
       // Fallback below will still present the reference to the user.
     }
-    Alert.alert('Codigo de referencia', code);
+    Alert.alert(t('myReservations.referenceAlertTitle'), code);
   };
 
   if (!session) {
@@ -174,7 +234,17 @@ export default function MyReservationsPage() {
 
   return (
     <MainLayout>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <Text style={styles.title}>{t('myReservations.title')}</Text>
         <Text style={styles.desc}>{t('myReservations.description')}</Text>
 
@@ -217,12 +287,7 @@ export default function MyReservationsPage() {
                       <Text style={styles.cardRef}>{t('myReservations.reference', { code: referenceCode })}</Text>
                     </View>
                     <View style={styles.statusBadge}>
-                      <Text style={styles.statusBadgeText}>
-                        {r.status === 'pending' && 'Pendiente'}
-                        {r.status === 'paid' && 'Pagado'}
-                        {r.status === 'fulfilled' && 'Finalizado'}
-                        {r.status === 'cancelled' && 'Cancelado'}
-                      </Text>
+                      <Text style={styles.statusBadgeText}>{statusLabel(r.status)}</Text>
                     </View>
                   </View>
 
@@ -245,6 +310,14 @@ export default function MyReservationsPage() {
                       <Text style={styles.cardGridLabel}>{t('myReservations.contactPreference')}</Text>
                       <Text style={styles.cardGridValue}>{contactLabel}</Text>
                     </View>
+                    <View style={styles.cardGridItem}>
+                      <Text style={styles.cardGridLabel}>{t('myReservations.totalLabel')}</Text>
+                      <Text style={styles.cardGridValue}>
+                        {r.total_amount != null
+                          ? formatCurrency(r.total_amount / 100, r.currency_code ?? 'USD', locale)
+                          : '—'}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={styles.notesBox}>
@@ -255,19 +328,28 @@ export default function MyReservationsPage() {
                   </View>
 
                   <View style={styles.cardActions}>
-                    <Pressable style={styles.trackBtn} onPress={() => router.push(`/reservations/status?ref=${referenceCode}` as any)}>
-                      <Text style={styles.trackBtnText}>Ver estado</Text>
+                    <Pressable
+                      style={styles.trackBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('myReservations.trackStatus')}
+                      onPress={() => router.push(`/reservations/status?ref=${referenceCode}` as any)}
+                    >
+                      <Text style={styles.trackBtnText}>{t('myReservations.trackStatus')}</Text>
                     </Pressable>
                     <Pressable
                       style={styles.trackBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('myReservations.copyCode')}
                       onPress={() => {
                         void copyReferenceCode(referenceCode);
                       }}
                     >
-                      <Text style={styles.trackBtnText}>Copiar</Text>
+                      <Text style={styles.trackBtnText}>{t('myReservations.copyCode')}</Text>
                     </Pressable>
                     <Pressable
                       style={styles.trackBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('myReservations.pdf')}
                       onPress={() => {
                         const ok = downloadReservationPdf({
                           reference: referenceCode,
@@ -281,12 +363,23 @@ export default function MyReservationsPage() {
                           notes: r.notes ?? '',
                         });
                         if (!ok) {
-                          Alert.alert('PDF', 'La descarga PDF por impresión está disponible en la versión web.');
+                          Alert.alert(t('booking.flow.pdfAlertTitle'), t('booking.flow.pdfWebOnly'));
                         }
                       }}
                     >
-                      <Text style={styles.trackBtnText}>PDF</Text>
+                      <Text style={styles.trackBtnText}>{t('myReservations.pdf')}</Text>
                     </Pressable>
+                    {(r.status === 'pending' || r.status === 'paid') && (
+                      <Pressable
+                        style={[styles.trackBtn, styles.cancelBtn]}
+                        disabled={cancellingId === r.id}
+                        onPress={() => void cancelReservation(r.id)}
+                      >
+                        <Text style={styles.trackBtnText}>
+                          {cancellingId === r.id ? t('myReservations.cancelling') : t('myReservations.cancel')}
+                        </Text>
+                      </Pressable>
+                    )}
                     {(r.status === 'fulfilled' || r.status === 'cancelled') && (
                       <Pressable
                         style={[styles.trackBtn, styles.deleteBtnz]}
@@ -301,18 +394,21 @@ export default function MyReservationsPage() {
 
                   {r.status === 'fulfilled' ? (
                     <View style={styles.feedbackBox}>
-                      <Text style={styles.feedbackTitle}>Califica tu experiencia</Text>
+                      <Text style={styles.feedbackTitle}>{t('myReservations.feedbackTitle')}</Text>
                       <View style={styles.feedbackRow}>
                         <Picker
                           value={String(feedback[r.id]?.rating ?? 5)}
                           onValueChange={(v) => updateFeedbackField(r.id, 'rating', v)}
-                          items={[5, 4, 3, 2, 1].map((score) => ({ label: `${score} estrellas`, value: String(score) }))}
+                          items={[5, 4, 3, 2, 1].map((score) => ({
+                            label: t('myReservations.starsCount', { count: score }),
+                            value: String(score),
+                          }))}
                         />
                         <TextInput
                           style={styles.feedbackInput}
                           value={feedback[r.id]?.comment ?? ''}
                           onChangeText={(v) => updateFeedbackField(r.id, 'comment', v)}
-                          placeholder="Comentario opcional"
+                          placeholder={t('myReservations.commentPlaceholder') as string}
                           placeholderTextColor={Colors.white40}
                           multiline
                         />
@@ -323,15 +419,15 @@ export default function MyReservationsPage() {
                         disabled={savingFeedbackId === r.id}
                       >
                         <Text style={styles.trackBtnText}>
-                          {savingFeedbackId === r.id ? 'Guardando...' : 'Guardar evaluación'}
+                          {savingFeedbackId === r.id
+                            ? t('myReservations.savingFeedback')
+                            : t('myReservations.saveFeedback')}
                         </Text>
                       </Pressable>
                     </View>
                   ) : (
                     <View style={styles.feedbackPendingBox}>
-                      <Text style={styles.feedbackPendingText}>
-                        Podras evaluar esta reserva cuando el estado sea Completada.
-                      </Text>
+                      <Text style={styles.feedbackPendingText}>{t('myReservations.feedbackPending')}</Text>
                     </View>
                   )}
                 </View>
@@ -339,13 +435,14 @@ export default function MyReservationsPage() {
             })}
           </View>
         )}
-      </View>
+      </ScrollView>
     </MainLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20, paddingVertical: 32 },
+  scroll: { flex: 1 },
+  container: { paddingHorizontal: 20, paddingVertical: 32, paddingBottom: 48 },
   centeredContainer: { paddingHorizontal: 20, paddingVertical: 48, alignItems: 'center' },
   title: { color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 8 },
   desc: { color: Colors.white70, fontSize: 15, lineHeight: 22, marginBottom: 24 },
@@ -422,11 +519,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.white20,
     borderRadius: 14,
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   trackBtnText: { color: Colors.white80, fontSize: 12, fontWeight: '600' },
   trackBtnDisabled: { opacity: 0.6 },
+  cancelBtn: { borderColor: 'rgba(253,164,175,0.45)' },
   deleteBtnz: { borderColor: '#008000' },
   feedbackBox: {
     marginTop: 12,

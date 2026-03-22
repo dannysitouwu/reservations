@@ -166,7 +166,9 @@ const translation = {
     },
     availabilityTitle: 'Disponibilidad sugerida',
     availabilityEmpty: 'Selecciona una experiencia para ver horarios recomendados.',
-    availabilityNone: 'Coordina con tu concierge para verificar disponibilidad personalizada.'
+    availabilityNone: 'Coordina con tu concierge para verificar disponibilidad personalizada.',
+    estimatedTotal: 'Total estimado',
+    priceHint: 'Precio base por persona × número de personas. Se confirma al pagar.'
   },
   availability: {
     weekday: {
@@ -182,6 +184,7 @@ const translation = {
   },
   statusLabels: {
     pending: 'Pendiente',
+    paid: 'Pagada',
     awaiting_confirmation: 'En confirmación',
     confirmed: 'Confirmada',
     in_progress: 'En curso',
@@ -197,7 +200,42 @@ const translation = {
     curatedTag: 'Curada',
     badges: ['Aventura', 'Naturaleza', 'Bienestar'],
     bookNow: 'Reservar ahora',
-    loading: 'Cargando experiencias tropicales…'
+    loading: 'Cargando experiencias tropicales…',
+    searchLabel: 'Buscar',
+    searchPlaceholder: 'Nombre o palabra clave',
+    locationLabel: 'Ubicación',
+    locationPlaceholder: 'Ej. Costa Rica, Guanacaste',
+    categoryLabel: 'Categoría',
+    categoryPlaceholder: 'Ej. Aventura, cultura',
+    sortLabel: 'Ordenar por',
+    sortRelevance: 'Relevancia (reseñas)',
+    sortPriceAsc: 'Precio: menor a mayor',
+    sortPriceDesc: 'Precio: mayor a menor',
+    sortRating: 'Mejor calificación',
+    applyFilters: 'Aplicar filtros',
+    empty: 'No hay experiencias con estos filtros. Prueba ampliar la búsqueda.',
+    viewDetail: 'Ver detalle',
+    reviewsShort: 'Reseñas',
+    prevPage: 'Anterior',
+    nextPage: 'Siguiente',
+    pageIndicator: 'Página {{page}}'
+  },
+  experience: {
+    loadError: 'No pudimos cargar esta experiencia.',
+    notFound: 'Experiencia no disponible.',
+    backToCatalog: 'Volver al catálogo',
+    from: 'Desde',
+    duration: '{{minutes}} minutos',
+    about: 'Acerca de',
+    location: 'Ubicación',
+    rating: 'Valoración',
+    ratingValue: '{{avg}} / 5 ({{count}} opiniones)',
+    noReviews: 'Sin reseñas aún',
+    availabilityTitle: 'Disponibilidad publicada',
+    availabilityEmpty: 'Consulta con concierge para fechas especiales.',
+    reviewsTitle: 'Opiniones de viajeros',
+    noReviewsYet: 'Sé el primero en vivir esta experiencia.',
+    reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Sigue tu reserva',
@@ -250,7 +288,8 @@ const translation = {
     savingProfile: 'Guardando perfil…',
     profileSaved: 'Perfil actualizado correctamente.',
     passwordMismatch: 'Las contraseñas no coinciden.',
-    checkEmail: 'Revisa {{email}} para confirmar tu cuenta antes de iniciar sesión.'
+    checkEmail: 'Revisa {{email}} para confirmar tu cuenta antes de iniciar sesión.',
+    passwordTooShort: 'La contraseña debe tener al menos 8 caracteres.'
   },
   notFound: {
     title: 'No encontramos esta página',
@@ -290,7 +329,11 @@ const translation = {
     notes: 'Notas del viajero',
     notesEmpty: 'No se registraron notas.',
     unscheduled: 'Por confirmar',
-    unnamedExperience: 'Experiencia en Costa Rica'
+    unnamedExperience: 'Experiencia en Costa Rica',
+    totalLabel: 'Total',
+    cancel: 'Cancelar reserva',
+    cancelling: 'Cancelando…',
+    cancelError: 'No se pudo cancelar la reserva.'
   },
   contact: {
     title: 'Habla con un experto',

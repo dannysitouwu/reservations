@@ -4,13 +4,22 @@ This directory contains SQL migrations and operational notes for the shared Supa
 
 ## Applying migrations
 
-Use the Supabase CLI or dashboard SQL editor.
+**Canonical path:** run the whole chain in order (CLI is easiest).
 
 ```bash
-supabase db push --db-url "postgresql://<user>:<password>@db.jnrcpvcsskjyujfodhrm.supabase.co:5432/postgres"
+supabase link
+supabase db push
 ```
 
-or copy the contents of `migrations/0001_reservations.sql` into the SQL editor and execute.
+For a **single SQL file** that mirrors all migrations (review before running anywhere):
+
+```bash
+bash supabase/scripts/concat-migrations.sh > supabase/SETUP_DATABASE.full.generated.sql
+```
+
+See `SETUP_DATABASE.sql` in this folder for the full bootstrap story. The old monolithic script is preserved as `SETUP_DATABASE.legacy.sql` (pre–migration-chain model).
+
+**Storage migration 0038** must not use `ALTER TABLE storage.objects` on Supabase hosted (ownership error); policies-only is in `migrations/0038_storage_service_photos_policies.sql`.
 
 ## Migration overview
 
@@ -25,6 +34,6 @@ or copy the contents of `migrations/0001_reservations.sql` into the SQL editor a
 
 - Buyers: default role. Can create reservations, read their own data, and cancel while pending.
 - Workers: elevated read/write over all reservation data and notes.
-- Admins: can promote users to worker/admin, manage all data.
+- Admins (`admin`) and super admins (`super_admin`): shared elevated access for operations (reservations, analytics, etc.). Only **`super_admin`** may change other users’ roles (see migration `0037` / `admin_set_profile_role`).
 
 Remember to keep the service role key out of browser bundles; use it only in secure runtime environments (Edge Functions, API routes, servers).

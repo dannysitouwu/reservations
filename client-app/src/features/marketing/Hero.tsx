@@ -24,11 +24,12 @@ export function Hero() {
 
   useEffect(() => {
     const fetchSummary = async () => {
-      const { data } = await supabase.from('feedback_summary_view').select('*').limit(1).maybeSingle();
-      if (data) {
+      const { data } = await supabase.rpc('public_feedback_summary');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row && typeof row === 'object') {
         setReviewSummary({
-          total_reviews: Number(data.total_reviews ?? 0),
-          average_rating: Number(data.average_rating ?? 0)
+          total_reviews: Number((row as { total_reviews?: number }).total_reviews ?? 0),
+          average_rating: Number((row as { average_rating?: number }).average_rating ?? 0)
         });
       }
     };

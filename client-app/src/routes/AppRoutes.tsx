@@ -6,6 +6,7 @@ import { CreateReservationPage } from '../pages/CreateReservationPage';
 import { HomePage } from '../pages/HomePage';
 import { MyReservationsPage } from '../pages/MyReservationsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { ExperienceDetailPage } from '../pages/ExperienceDetailPage';
 import { ReservationOptionsPage } from '../pages/ReservationOptionsPage';
 import { ReservationStatusPage } from '../pages/ReservationStatusPage';
 
@@ -16,6 +17,7 @@ export function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/experiences/:id" element={<ExperienceDetailPage />} />
         <Route path="/reservations/new" element={<CreateReservationPage />} />
         <Route path="/reservations/status" element={<ReservationStatusPage />} />
         <Route path="/reservations/options" element={<ReservationOptionsPage />} />

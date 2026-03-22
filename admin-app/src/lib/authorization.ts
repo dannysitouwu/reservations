@@ -1,6 +1,6 @@
 import type { WorkerProfile } from '../types/profile';
 
 export function isAdmin(role: WorkerProfile['role'] | null | undefined) {
-  return role === 'admin';
+  return role === 'admin' || role === 'super_admin';
 }
 

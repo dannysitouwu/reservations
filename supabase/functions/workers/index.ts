@@ -58,7 +58,8 @@ serve(async (req) => {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !adminProfile || adminProfile.role !== "admin") {
+  const privileged = adminProfile?.role === "admin" || adminProfile?.role === "super_admin";
+  if (profileError || !adminProfile || !privileged) {
     return jsonResponse({ error: "No autorizado" }, { status: 403 });
   }
 

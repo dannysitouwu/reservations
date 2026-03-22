@@ -1,0 +1,13 @@
+{
+  "plugins": {
+    "supabase": {
+      "enabled": true
+    },
+    "parallel": {
+      "enabled": true
+    },
+    "linear": {
+      "enabled": true
+    }
+  }
+}
