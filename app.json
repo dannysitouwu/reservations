@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "reservations",
-    "slug": "reservations",
+    "slug": "reservations-pro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -20,7 +20,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -56,7 +59,12 @@
       "VITE_SUPABASE_URL": "https://hgrmnranklskhxjndabf.supabase.co",
       "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhncm1ucmFua2xza2h4am5kYWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NTI0MjcsImV4cCI6MjA4NjMyODQyN30.JJRfTdPfWynH1DjiZZ2oBXavlAhvxb5kDhFtD-WmD7c",
       "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TEPt3CunVJ3zeF6lz4cs20nADVGRupvn8Vzp9fyRR9KoWw9j3n3wvdRyBFCmqp9LKvO4Bq0elhOI4Ucdv1k98zt00P6fLaWcJ",
-      "VITE_STRIPE_PUBLISHABLE_KEY": ""
-    }
+      "VITE_STRIPE_PUBLISHABLE_KEY": "",
+      "router": {},
+      "eas": {
+        "projectId": "a25366ba-8382-433d-b526-ce7a6b3b59d7"
+      }
+    },
+    "owner": "kamhs-organization"
   }
 }
