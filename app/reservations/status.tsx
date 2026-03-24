@@ -107,7 +107,7 @@ export default function ReservationStatusPage() {
                 </Text>
               </View>
               <View style={styles.resultItem}>
-                <Text style={styles.resultLabel}>{t('statusPage.labels.concierge')}</Text>
+                <Text style={styles.resultLabel}>{t('statusPage.labels.Empleado')}</Text>
                 <Text style={styles.resultValue}>{result.assigned_worker_name ?? '—'}</Text>
               </View>
               <View style={styles.resultItem}>

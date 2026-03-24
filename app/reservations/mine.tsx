@@ -41,6 +41,11 @@ type FeedbackRow = {
   comment: string | null;
 };
 
+type ProfileContact = {
+  full_name: string | null;
+  phone: string | null;
+};
+
 export default function MyReservationsPage() {
   const { client, session } = useSupabase();
   const { t, i18n } = useTranslation();
@@ -51,8 +56,8 @@ export default function MyReservationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, { rating: number; comment: string }>>({});
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
-  const [hiddenReservationIds, setHiddenReservationIds] = useState<Set<string>>(new Set());
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [profileContact, setProfileContact] = useState<ProfileContact | null>(null);
 
   const locale = useMemo(() => (i18n.language.startsWith('es') ? 'es-CR' : 'en-US'), [i18n.language]);
   const contactPreferenceOptions = useMemo(
@@ -86,11 +91,18 @@ export default function MyReservationsPage() {
         .select('reservation_id, rating, comment')
         .eq('buyer_id', session.user.id);
 
+      const { data: profileRow } = await client
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
       if (fetchError) {
         setError(t('myReservations.error'));
         setReservations([]);
       } else {
-        setReservations((data as ReservationDetail[]) ?? []);
+        const rows = (data as (ReservationDetail & { buyer_archived_at?: string | null })[]) ?? [];
+        setReservations(rows.filter((r) => !r.buyer_archived_at));
         const nextFeedback: Record<string, { rating: number; comment: string }> = {};
         ((feedbackRows as FeedbackRow[] | null) ?? []).forEach((row) => {
           nextFeedback[row.reservation_id] = {
@@ -99,6 +111,7 @@ export default function MyReservationsPage() {
           };
         });
         setFeedback(nextFeedback);
+        setProfileContact((profileRow as ProfileContact | null) ?? null);
       }
       if (!opts?.silent) setLoading(false);
     },
@@ -166,6 +179,22 @@ export default function MyReservationsPage() {
       return;
     }
     setReservations((prev) => prev.map((r) => (r.id === reservationId ? { ...r, status: 'cancelled' } : r)));
+  };
+
+  const archiveReservation = async (reservationId: string) => {
+    if (!session?.user) return;
+    setError(null);
+    const { error: upErr } = await client
+      .from('reservations')
+      .update({ buyer_archived_at: new Date().toISOString() })
+      .eq('id', reservationId)
+      .eq('buyer_id', session.user.id)
+      .in('status', ['fulfilled', 'cancelled']);
+    if (upErr) {
+      setError(t('myReservations.archiveError'));
+      return;
+    }
+    setReservations((prev) => prev.filter((r) => r.id !== reservationId));
   };
 
   const statusLabel = (status: string) => {
@@ -267,9 +296,7 @@ export default function MyReservationsPage() {
           </View>
         ) : (
           <View style={styles.list}>
-            {reservations
-              .filter((r) => !hiddenReservationIds.has(r.id))
-              .map((r) => {
+            {reservations.map((r) => {
               const referenceCode = r.public_reference || r.id.slice(0, 8).toUpperCase();
               const scheduledDate = r.scheduled_for
                 ? new Date(r.scheduled_for).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })
@@ -354,8 +381,8 @@ export default function MyReservationsPage() {
                         const ok = downloadReservationPdf({
                           reference: referenceCode,
                           optionName: r.service_name,
-                          fullName: '',
-                          phone: '',
+                          fullName: profileContact?.full_name ?? '',
+                          phone: profileContact?.phone ?? '',
                           scheduledDate,
                           scheduledTime: '',
                           partySize: r.party_size ? String(r.party_size) : '',
@@ -383,9 +410,8 @@ export default function MyReservationsPage() {
                     {(r.status === 'fulfilled' || r.status === 'cancelled') && (
                       <Pressable
                         style={[styles.trackBtn, styles.deleteBtnz]}
-                        onPress={() => {
-                          setHiddenReservationIds((prev) => new Set([...prev, r.id]));
-                        }}
+                        accessibilityLabel={t('myReservations.archiveAction')}
+                        onPress={() => void archiveReservation(r.id)}
                       >
                         <Text style={styles.trackBtnText}>🗑️</Text>
                       </Pressable>

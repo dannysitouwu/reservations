@@ -29,4 +29,6 @@ export type ReservationDetail = Reservation & {
   notes: string | null;
   contact_preference: string | null;
   party_size: number | null;
+  /** From reservation.metadata.preferred_payment_method */
+  preferred_payment_method?: string | null;
 };

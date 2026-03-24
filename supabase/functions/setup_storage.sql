@@ -12,6 +12,11 @@
 --
 -- Si la subida falla con "new row violates row-level security policy",
 -- ejecuta 0038 o revisa que tu usuario tenga role admin/super_admin en profiles.
+--
+-- Bucket `avatars` (app móvil Expo, foto de perfil): migración 0041 crea el bucket
+-- y políticas. El primer segmento de la ruta del archivo DEBE ser el UUID del usuario
+-- (auth.uid), por ejemplo `550e8400-.../1730000000.jpg`. Si renombras esa carpeta
+-- en el panel (p. ej. a "user pfp"), las subidas desde la app fallarán por RLS.
 -- =============================================================================
 
 -- Opcional: crear bucket por SQL (puede requerir permisos de superuser en local)

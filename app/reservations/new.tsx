@@ -1,4 +1,3 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +14,9 @@ import {
 } from 'react-native';
 import MainLayout from '../../src/components/MainLayout';
 import { Picker } from '../../src/components/Picker';
+import { StripeCardPayment } from '../../src/components/StripeCardPayment';
 import { Colors } from '../../src/constants/colors';
+import { getStripePublishableKey } from '../../src/lib/supabaseUrl';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { downloadReservationPdf } from '../../src/utils/reservationPdf';
 import { formatCurrency } from '../../src/utils/currency';
@@ -32,12 +33,6 @@ type AvailabilitySlot = { weekday: number; start_time: string; end_time: string;
 function toMinutes(time: string): number {
   const [h, m] = time.slice(0, 5).split(':').map(Number);
   return h * 60 + m;
-}
-
-function hhmmFromDate(value: Date): string {
-  const hh = String(value.getHours()).padStart(2, '0');
-  const mm = String(value.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
 }
 
 function buildSlotTimes(startTime: string, endTime: string): string[] {
@@ -60,10 +55,6 @@ export default function CreateReservationPage() {
 
   const [options, setOptions] = useState<ExperienceOption[]>([]);
   const [selectedOption, setSelectedOption] = useState(optionId ?? '');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [webDate, setWebDate] = useState('');
   const [webTime, setWebTime] = useState('');
   const [notes, setNotes] = useState('');
@@ -77,6 +68,11 @@ export default function CreateReservationPage() {
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
   const [bookedName, setBookedName] = useState('');
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<'sinpe' | 'card' | 'cash'>('sinpe');
+  const [createdReservationId, setCreatedReservationId] = useState<string | null>(null);
+  const [stripeDismissed, setStripeDismissed] = useState(false);
+  const [cardPaymentSucceeded, setCardPaymentSucceeded] = useState(false);
 
   const selectedExperience = options.find((o) => o.id === selectedOption);
 
@@ -93,12 +89,9 @@ export default function CreateReservationPage() {
   const hasAvailabilityRules = availability.length > 0;
 
   const selectedWeekday = useMemo(() => {
-    if (Platform.OS === 'web') {
-      if (!webDate) return null;
-      return new Date(`${webDate}T10:00:00`).getDay();
-    }
-    return selectedDate ? selectedDate.getDay() : null;
-  }, [selectedDate, webDate]);
+    if (!webDate) return null;
+    return new Date(`${webDate}T10:00:00`).getDay();
+  }, [webDate]);
 
   const isTimeAllowed = (weekday: number, timeHHMM: string) => {
     if (!hasAvailabilityRules) return true;
@@ -109,6 +102,7 @@ export default function CreateReservationPage() {
   };
 
   const webDateItems = useMemo(() => {
+    if (!hasAvailabilityRules) return [];
     const now = new Date();
     return Array.from({ length: 30 }).map((_, idx) => {
       const d = new Date(now);
@@ -132,34 +126,39 @@ export default function CreateReservationPage() {
   );
 
   const webTimeItems = useMemo(() => {
-    const items: { label: string; value: string }[] = [];
-    if (hasAvailabilityRules) {
-      if (selectedWeekday === null) return items;
-      const byDay = availability.filter((slot) => slot.weekday === selectedWeekday);
-      const unique = new Set<string>();
-      byDay.forEach((slot) => {
-        buildSlotTimes(slot.start_time, slot.end_time).forEach((time) => unique.add(time));
-      });
-      return Array.from(unique)
-        .sort((a, b) => toMinutes(a) - toMinutes(b))
-        .map((value) => ({ label: value, value }));
-    }
-
-    for (let h = 7; h <= 22; h += 1) {
-      for (const m of [0, 15, 30, 45]) {
-        const hh = String(h).padStart(2, '0');
-        const mm = String(m).padStart(2, '0');
-        items.push({ label: `${hh}:${mm}`, value: `${hh}:${mm}` });
-      }
-    }
-    return items;
+    if (!hasAvailabilityRules) return [];
+    if (selectedWeekday === null) return [];
+    const byDay = availability.filter((slot) => slot.weekday === selectedWeekday);
+    const unique = new Set<string>();
+    byDay.forEach((slot) => {
+      buildSlotTimes(slot.start_time, slot.end_time).forEach((time) => unique.add(time));
+    });
+    return Array.from(unique)
+      .sort((a, b) => toMinutes(a) - toMinutes(b))
+      .map((value) => ({ label: value, value }));
   }, [availability, hasAvailabilityRules, selectedWeekday]);
+
+  const canGoToStep2 = Boolean(selectedOption);
+  const canGoToStep3 = Boolean(
+    selectedOption &&
+      webDate &&
+      webTime &&
+      fullName.trim() &&
+      phone.trim() &&
+      (!hasAvailabilityRules ||
+        (allowedWeekdays.has(new Date(`${webDate}T10:00:00`).getDay()) &&
+          isTimeAllowed(new Date(`${webDate}T10:00:00`).getDay(), webTime))),
+  );
+
+  const goToWizardStep = (s: 1 | 2 | 3) => {
+    if (s === 1) setWizardStep(1);
+    if (s === 2 && canGoToStep2) setWizardStep(2);
+    if (s === 3 && canGoToStep3) setWizardStep(3);
+  };
 
   const selectedDateLabel = webDate
     ? webDateItems.find((d) => d.value === webDate)?.label ?? webDate
-    : selectedDate
-      ? selectedDate.toLocaleDateString(localeDate, { day: '2-digit', month: 'short', year: 'numeric' })
-      : '';
+    : '';
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -206,14 +205,12 @@ export default function CreateReservationPage() {
   }, [client, selectedOption]);
 
   useEffect(() => {
-    setSelectedDate(null);
-    setSelectedTime(null);
     setWebDate('');
     setWebTime('');
+    setWizardStep(1);
   }, [selectedOption]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
     if (!webDate || webTimeItems.some((item) => item.value === webTime)) return;
     setWebTime('');
   }, [webDate, webTime, webTimeItems]);
@@ -227,53 +224,30 @@ export default function CreateReservationPage() {
     setSubmitting(true);
     setError(null);
 
-    // Compose scheduled_for from date + time pickers
     let scheduledFor: string | null = null;
-    if (Platform.OS === 'web' && webDate) {
-      if (!webTime) {
-        setSubmitting(false);
-        setError(t('booking.errors.selectTime'));
-        return;
-      }
-      const weekday = new Date(`${webDate}T10:00:00`).getDay();
-      if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
-        setSubmitting(false);
-        setError(t('booking.errors.dateNotAvailable'));
-        return;
-      }
-      if (!isTimeAllowed(weekday, webTime)) {
-        setSubmitting(false);
-        setError(t('booking.errors.timeNotAllowed'));
-        return;
-      }
-      const d = new Date(`${webDate}T${webTime}:00`);
-      scheduledFor = d.toISOString();
-    } else if (selectedDate) {
-      if (!selectedTime) {
-        setSubmitting(false);
-        setError(t('booking.errors.selectTime'));
-        return;
-      }
-      const weekday = selectedDate.getDay();
-      const selectedHHMM = hhmmFromDate(selectedTime);
-      if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
-        setSubmitting(false);
-        setError(t('booking.errors.dateNotAvailable'));
-        return;
-      }
-      if (!isTimeAllowed(weekday, selectedHHMM)) {
-        setSubmitting(false);
-        setError(t('booking.errors.timeNotAllowed'));
-        return;
-      }
-      const d = new Date(selectedDate);
-      d.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
-      scheduledFor = d.toISOString();
-    } else {
+    if (!webDate) {
       setSubmitting(false);
       setError(t('booking.errors.dateTimeRequired'));
       return;
     }
+    if (!webTime) {
+      setSubmitting(false);
+      setError(t('booking.errors.selectTime'));
+      return;
+    }
+    const weekday = new Date(`${webDate}T10:00:00`).getDay();
+    if (hasAvailabilityRules && !allowedWeekdays.has(weekday)) {
+      setSubmitting(false);
+      setError(t('booking.errors.dateNotAvailable'));
+      return;
+    }
+    if (!isTimeAllowed(weekday, webTime)) {
+      setSubmitting(false);
+      setError(t('booking.errors.timeNotAllowed'));
+      return;
+    }
+    const d = new Date(`${webDate}T${webTime}:00`);
+    scheduledFor = d.toISOString();
 
     const payload: Record<string, unknown> = {
       service_option_id: selectedOption,
@@ -284,22 +258,28 @@ export default function CreateReservationPage() {
       contact_preference: contactPreference || null,
     };
     payload.party_size = parsed !== null ? String(parsed) : '1';
+    payload.preferred_payment_method = preferredPaymentMethod;
 
     const { data, error: rpcError } = await client.rpc('client_create_reservation', {
       reservation_input: payload,
     });
 
+    const newId = (data as { reservation_id?: string } | null)?.reservation_id;
+
     if (rpcError) {
       console.error('[reservation] RPC error:', rpcError);
       setError(rpcError.message ?? t('booking.errors.generic'));
-    } else if (data?.reservation_id) {
+    } else if (newId) {
       const { data: resData } = await client
         .from('reservations')
         .select('public_reference')
-        .eq('id', data.reservation_id)
+        .eq('id', newId)
         .maybeSingle();
       setBookedName(selectedExperience?.name ?? '');
-      setTrackingCode(resData?.public_reference ?? data.reservation_id);
+      setCreatedReservationId(newId);
+      setStripeDismissed(false);
+      setCardPaymentSucceeded(false);
+      setTrackingCode(resData?.public_reference ?? newId);
     }
     setSubmitting(false);
   };
@@ -322,6 +302,16 @@ export default function CreateReservationPage() {
     );
   }
 
+  const stripePk = getStripePublishableKey();
+  const showStripeCheckout =
+    Platform.OS === 'web' &&
+    preferredPaymentMethod === 'card' &&
+    Boolean(stripePk) &&
+    Boolean(session?.access_token) &&
+    Boolean(createdReservationId) &&
+    !stripeDismissed &&
+    !cardPaymentSucceeded;
+
   // ── Success screen with tracking code ──
   if (trackingCode) {
     return (
@@ -341,6 +331,40 @@ export default function CreateReservationPage() {
             <Text style={styles.trackingHint}>{t('booking.flow.trackingHint')}</Text>
           </View>
 
+          {preferredPaymentMethod === 'card' && Platform.OS === 'web' && !stripePk ? (
+            <Text style={styles.stripeHint}>{t('booking.flow.stripeNotConfigured')}</Text>
+          ) : null}
+
+          {preferredPaymentMethod === 'card' && Platform.OS !== 'web' ? (
+            <Text style={styles.stripeHint}>{t('booking.flow.paymentCardNative')}</Text>
+          ) : null}
+
+          {showStripeCheckout && createdReservationId && session?.access_token ? (
+            <StripeCardPayment
+              key={createdReservationId}
+              reservationId={createdReservationId}
+              accessToken={session.access_token}
+              onPaid={() => {
+                setCardPaymentSucceeded(true);
+                Alert.alert(t('booking.flow.paymentCardTitle'), t('booking.flow.paymentCardDone'));
+              }}
+              onDismiss={() => setStripeDismissed(true)}
+              labels={{
+                title: t('booking.flow.paymentCardTitle'),
+                pay: t('booking.flow.paymentCardPay'),
+                paying: t('booking.flow.paymentCardPaying'),
+                dismiss: t('booking.flow.paymentCardDismiss'),
+                success: t('booking.flow.paymentCardDone'),
+                errorPrefix: t('booking.flow.paymentCardError'),
+                nativeHint: t('booking.flow.paymentCardNative'),
+              }}
+            />
+          ) : null}
+
+          {preferredPaymentMethod === 'card' ? (
+            <Text style={styles.stripeHint}>{t('booking.flow.paymentCardHint')}</Text>
+          ) : null}
+
           <View style={styles.successActions}>
             <Pressable style={styles.btnPrimary} onPress={() => router.push('/reservations/mine')}>
               <Text style={styles.btnPrimaryText}>{t('booking.flow.viewMine')}</Text>
@@ -350,9 +374,11 @@ export default function CreateReservationPage() {
             </Pressable>
             <Pressable style={styles.btnGhost} onPress={() => {
               setTrackingCode(null);
+              setCreatedReservationId(null);
+              setStripeDismissed(false);
+              setCardPaymentSucceeded(false);
+              setPreferredPaymentMethod('sinpe');
               setSelectedOption('');
-              setSelectedDate(null);
-              setSelectedTime(null);
               setWebDate('');
               setWebTime('');
               setNotes('');
@@ -370,9 +396,7 @@ export default function CreateReservationPage() {
                   fullName,
                   phone,
                   scheduledDate: selectedDateLabel,
-                  scheduledTime: webTime || (selectedTime
-                    ? selectedTime.toLocaleTimeString(localeDate, { hour: '2-digit', minute: '2-digit' })
-                    : ''),
+                  scheduledTime: webTime || '',
                   partySize,
                   contactPreference,
                   notes,
@@ -403,25 +427,43 @@ export default function CreateReservationPage() {
           <Text style={styles.desc}>{t('booking.description')}</Text>
         </View>
 
-        {/* Progress steps */}
+        {/* Pasos: pulsables; avanzan solo si el paso anterior es válido */}
         <View style={styles.progressRow}>
-          {[
-            { num: '1', label: t('booking.flow.stepExperience') },
-            { num: '2', label: t('booking.flow.stepDetails') },
-            { num: '3', label: t('booking.flow.stepConfirm') },
-          ].map((step, idx) => (
-            <View key={step.num} style={styles.progressItem}>
-              <View style={[styles.progressDot, idx === 0 && styles.progressDotActive]}>
-                <Text style={[styles.progressNum, idx === 0 && styles.progressNumActive]}>
-                  {step.num}
-                </Text>
-              </View>
-              <Text style={styles.progressLabel}>{step.label}</Text>
-            </View>
-          ))}
+          {(
+            [
+              { num: 1 as const, label: t('booking.flow.stepExperience') },
+              { num: 2 as const, label: t('booking.flow.stepDetails') },
+              { num: 3 as const, label: t('booking.flow.stepConfirm') },
+            ] as const
+          ).map((step) => {
+            const active = wizardStep === step.num;
+            const done = wizardStep > step.num;
+            return (
+              <Pressable
+                key={step.num}
+                accessibilityRole="button"
+                accessibilityLabel={step.label}
+                onPress={() => goToWizardStep(step.num)}
+                style={styles.progressItem}
+              >
+                <View
+                  style={[
+                    styles.progressDot,
+                    active && styles.progressDotActive,
+                    done && !active && styles.progressDotDone,
+                  ]}
+                >
+                  <Text style={[styles.progressNum, (active || done) && styles.progressNumActive]}>
+                    {done && !active ? '✓' : String(step.num)}
+                  </Text>
+                </View>
+                <Text style={[styles.progressLabel, active && styles.progressLabelActive]}>{step.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* Section 1 — Experience */}
+        {wizardStep === 1 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>01</Text>
@@ -468,20 +510,38 @@ export default function CreateReservationPage() {
             </View>
           ) : null}
         </View>
+        ) : null}
 
-        {/* Section 2 — Date & Time */}
+        {wizardStep === 2 ? (
+        <>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>02</Text>
             <Text style={styles.sectionTitle}>{t('booking.flow.sectionWhen')}</Text>
           </View>
 
-          <View style={styles.dateTimeRow}>
+          <View style={[styles.dateTimeRow, Platform.OS !== 'web' && styles.dateTimeRowStack]}>
             <View style={styles.dateTimeCol}>
               <Text style={styles.label}>📅  {t('booking.flow.dateLabel')}</Text>
-              {Platform.OS === 'web' ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-                  {filteredWebDateItems.slice(0, 14).map((item) => {
+              {hasAvailabilityRules ? (
+                <Text style={styles.chipHint}>{t('booking.flow.dateHintAvailability')}</Text>
+              ) : null}
+              {!selectedOption ? (
+                <Text style={styles.helperText}>{t('booking.flow.pickExperienceFirst')}</Text>
+              ) : loadingAvailability ? (
+                <ActivityIndicator color={Colors.primary} size="small" style={{ marginVertical: 12 }} />
+              ) : !hasAvailabilityRules ? (
+                <Text style={styles.availabilityHint}>{t('booking.flow.noAvailabilityPublished')}</Text>
+              ) : (
+                <ScrollView
+                  horizontal={Platform.OS === 'web'}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={[
+                    styles.chipsRow,
+                    Platform.OS !== 'web' && styles.chipsRowNative,
+                  ]}
+                >
+                  {filteredWebDateItems.slice(0, 21).map((item) => {
                     const active = webDate === item.value;
                     return (
                       <Pressable
@@ -494,21 +554,20 @@ export default function CreateReservationPage() {
                     );
                   })}
                 </ScrollView>
-              ) : (
-                <Pressable style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-                  <Text style={selectedDate ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
-                    {selectedDate
-                      ? selectedDate.toLocaleDateString(localeDate, { day: '2-digit', month: 'short', year: 'numeric' })
-                      : t('booking.flow.selectDate')}
-                  </Text>
-                </Pressable>
               )}
             </View>
 
             <View style={styles.dateTimeCol}>
               <Text style={styles.label}>🕐  {t('booking.flow.timeLabel')}</Text>
-              {Platform.OS === 'web' ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+              {!selectedOption || loadingAvailability || !hasAvailabilityRules ? null : (
+                <ScrollView
+                  horizontal={Platform.OS === 'web'}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={[
+                    styles.chipsRow,
+                    Platform.OS !== 'web' && styles.chipsRowNative,
+                  ]}
+                >
                   {webTimeItems.map((item) => {
                     const active = webTime === item.value;
                     return (
@@ -522,68 +581,15 @@ export default function CreateReservationPage() {
                     );
                   })}
                 </ScrollView>
-              ) : (
-                <Pressable style={styles.dateBtn} onPress={() => setShowTimePicker(true)}>
-                  <Text style={selectedTime ? styles.dateBtnTextSelected : styles.dateBtnTextPlaceholder}>
-                    {selectedTime
-                      ? selectedTime.toLocaleTimeString(localeDate, { hour: '2-digit', minute: '2-digit', hour12: true })
-                      : t('booking.flow.selectTime')}
-                  </Text>
-                </Pressable>
               )}
             </View>
           </View>
 
-          {Platform.OS === 'web' && selectedOption && webDate && webTimeItems.length === 0 ? (
+          {selectedOption && hasAvailabilityRules && webDate && webTimeItems.length === 0 ? (
             <Text style={styles.helperText}>{t('booking.flow.noTimesForDate')}</Text>
           ) : null}
-
-          {/* Native inline pickers */}
-          {Platform.OS !== 'web' && showDatePicker && (
-            <View style={styles.pickerContainer}>
-              <DateTimePicker
-                value={selectedDate ?? new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date()}
-                onChange={(_event, date) => {
-                  if (Platform.OS !== 'ios') setShowDatePicker(false);
-                  if (date) setSelectedDate(date);
-                }}
-                textColor="#fff"
-                themeVariant="dark"
-              />
-              {Platform.OS === 'ios' && (
-                <Pressable style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.pickerDoneBtnText}>{t('booking.flow.pickerDone')}</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-          {Platform.OS !== 'web' && showTimePicker && (
-            <View style={styles.pickerContainer}>
-              <DateTimePicker
-                value={selectedTime ?? new Date()}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minuteInterval={15}
-                onChange={(_event, time) => {
-                  if (Platform.OS !== 'ios') setShowTimePicker(false);
-                  if (time) setSelectedTime(time);
-                }}
-                textColor="#fff"
-                themeVariant="dark"
-              />
-              {Platform.OS === 'ios' && (
-                <Pressable style={styles.pickerDoneBtn} onPress={() => setShowTimePicker(false)}>
-                  <Text style={styles.pickerDoneBtnText}>{t('booking.flow.pickerDone')}</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
         </View>
 
-        {/* Section 3 — Contact info */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>03</Text>
@@ -641,11 +647,30 @@ export default function CreateReservationPage() {
             </View>
           </View>
         </View>
+        </>
+        ) : null}
 
-        {/* Notes */}
+        {wizardStep === 3 ? (
+        <>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionNum}>04</Text>
+            <Text style={styles.sectionTitle}>{t('booking.flow.sectionPayment')}</Text>
+          </View>
+          <Picker
+            value={preferredPaymentMethod}
+            onValueChange={(v) => setPreferredPaymentMethod(v as 'sinpe' | 'card' | 'cash')}
+            items={[
+              { label: t('booking.flow.paymentSinpe'), value: 'sinpe' },
+              { label: t('booking.flow.paymentCard'), value: 'card' },
+              { label: t('booking.flow.paymentCash'), value: 'cash' },
+            ]}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionNum}>05</Text>
             <Text style={styles.sectionTitle}>{t('booking.flow.sectionNotes')}</Text>
           </View>
           <TextInput
@@ -673,14 +698,12 @@ export default function CreateReservationPage() {
           </View>
         ) : null}
 
-        {/* Error */}
         {error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>⚠  {error}</Text>
           </View>
         ) : null}
 
-        {/* Submit */}
         <Pressable
           style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
           onPress={handleSubmit}
@@ -699,6 +722,35 @@ export default function CreateReservationPage() {
         </Pressable>
 
         <Text style={styles.disclaimer}>{t('booking.flow.disclaimer')}</Text>
+        </>
+        ) : null}
+
+        <View style={[styles.wizardNav, wizardStep === 1 && styles.wizardNavEnd]}>
+          {wizardStep > 1 ? (
+            <Pressable
+              style={styles.wizardBtnGhost}
+              onPress={() => setWizardStep((w) => (w > 1 ? ((w - 1) as 1 | 2 | 3) : w))}
+            >
+              <Text style={styles.wizardBtnGhostText}>{t('booking.flow.back')}</Text>
+            </Pressable>
+          ) : null}
+          {wizardStep < 3 ? (
+            <Pressable
+              style={[
+                styles.wizardBtnPrimary,
+                ((wizardStep === 1 && !canGoToStep2) || (wizardStep === 2 && !canGoToStep3)) &&
+                  styles.wizardBtnDisabled,
+              ]}
+              disabled={(wizardStep === 1 && !canGoToStep2) || (wizardStep === 2 && !canGoToStep3)}
+              onPress={() => {
+                if (wizardStep === 1 && canGoToStep2) setWizardStep(2);
+                else if (wizardStep === 2 && canGoToStep3) setWizardStep(3);
+              }}
+            >
+              <Text style={styles.wizardBtnPrimaryText}>{t('booking.flow.next')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </MainLayout>
   );
@@ -731,6 +783,14 @@ const styles = StyleSheet.create({
   trackingLabel: { color: Colors.white50, fontSize: 12, fontWeight: '600', letterSpacing: 2 },
   trackingCode: { color: Colors.primary, fontSize: 36, fontWeight: '800', letterSpacing: 6 },
   trackingHint: { color: Colors.white50, fontSize: 13, textAlign: 'center', lineHeight: 18, marginTop: 4 },
+  stripeHint: {
+    color: Colors.white60,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
   successActions: { width: '100%', maxWidth: 400, gap: 10, marginTop: 16 },
 
   // Container
@@ -760,9 +820,37 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   progressDotActive: { borderColor: Colors.primary, backgroundColor: 'rgba(14,165,233,0.15)' },
+  progressDotDone: { borderColor: 'rgba(16,185,129,0.45)', backgroundColor: 'rgba(16,185,129,0.12)' },
   progressNum: { color: Colors.white40, fontSize: 13, fontWeight: '700' },
   progressNumActive: { color: Colors.primary },
   progressLabel: { color: Colors.white50, fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
+  progressLabelActive: { color: Colors.white80 },
+
+  wizardNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  wizardNavEnd: { justifyContent: 'flex-end' },
+  wizardBtnGhost: {
+    borderWidth: 1,
+    borderColor: Colors.white20,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+  },
+  wizardBtnGhostText: { color: Colors.white70, fontWeight: '600', fontSize: 14 },
+  wizardBtnPrimary: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 14,
+  },
+  wizardBtnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  wizardBtnDisabled: { opacity: 0.45 },
 
   // Sections
   section: {
@@ -785,41 +873,41 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', gap: 12 },
   inputCol: { flex: 1 },
 
-  // Date/time pickers
+  // Date/time (chips; mismo criterio que web en iOS/Android)
   dateTimeRow: { flexDirection: 'row', gap: 12 },
+  dateTimeRowStack: { flexDirection: 'column' },
   dateTimeCol: { flex: 1 },
   chipsRow: { gap: 8, paddingBottom: 4 },
+  chipsRowNative: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  chipHint: { color: Colors.white50, fontSize: 11, marginBottom: 6, lineHeight: 15 },
   chip: {
     borderWidth: 1,
     borderColor: Colors.white20,
     backgroundColor: 'rgba(2,44,34,0.55)',
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chipActive: {
     borderColor: Colors.primary,
     backgroundColor: 'rgba(14,165,233,0.2)',
   },
-  chipText: { color: Colors.white70, fontSize: 12, fontWeight: '600' },
+  chipText: {
+    color: Colors.white70,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    textAlign: 'center',
+    ...Platform.select({
+      android: { includeFontPadding: false },
+      default: {},
+    }),
+  },
   chipTextActive: { color: '#fff' },
   helperText: { color: Colors.white50, fontSize: 12, marginTop: 8 },
-  dateBtn: {
-    borderWidth: 1, borderColor: Colors.white15, backgroundColor: 'rgba(2,44,34,0.5)',
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    alignItems: 'center',
-  },
-  dateBtnTextSelected: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  dateBtnTextPlaceholder: { color: Colors.white40, fontSize: 14 },
-  pickerContainer: {
-    backgroundColor: 'rgba(2,44,34,0.85)',
-    borderWidth: 1, borderColor: Colors.white15,
-    borderRadius: 16, overflow: 'hidden', marginTop: 4,
-  },
-  pickerDoneBtn: {
-    alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10,
-  },
-  pickerDoneBtnText: { color: Colors.primary, fontSize: 15, fontWeight: '700' },
 
   // Experience preview
   experiencePreview: { backgroundColor: Colors.white05, borderRadius: 12, padding: 14, borderLeftWidth: 3, borderLeftColor: Colors.primary },

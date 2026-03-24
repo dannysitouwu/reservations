@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,28 +12,42 @@ type FeedbackSummary = {
   average_rating: number;
 };
 
+type HighlightItem = { iconName?: string; title: string; description: string };
+
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [catalogCount, setCatalogCount] = useState<number | null>(null);
 
-  const baseStats = (t('hero.stats', { returnObjects: true }) || []) as Array<{ value: string; label: string }>;
+  const baseStatsRaw = t('hero.stats', { returnObjects: true }) as unknown;
+  const baseStats = Array.isArray(baseStatsRaw) ? (baseStatsRaw as Array<{ value: string; label: string }>) : [];
   const stats = useMemo(() => {
-    if (!feedbackSummary || feedbackSummary.total_reviews <= 0 || baseStats.length < 2) {
-      return baseStats;
-    }
-    return [
-      baseStats[0],
-      {
-        value: `${Number(feedbackSummary.average_rating).toFixed(1)}/5`,
-        label: t('hero.averageFromReviews', { count: feedbackSummary.total_reviews }),
-      },
-    ];
-  }, [baseStats, feedbackSummary, t]);
-  const team = (t('hero.card.team', { returnObjects: true }) || []) as string[];
-  const highlights = (t('highlights.items', { returnObjects: true }) || []) as Array<{ icon: string; title: string; description: string }>;
-  const steps = (t('flow.steps', { returnObjects: true }) || []) as Array<{ step: string; title: string; description: string }>;
-  const testimonials = (t('testimonials.items', { returnObjects: true }) || []) as Array<{ quote: string; name: string; role: string }>;
+    const firstStat =
+      catalogCount != null
+        ? { value: String(catalogCount), label: t('hero.catalogCountLabel', { count: catalogCount }) }
+        : baseStats[0];
+    const secondStat =
+      feedbackSummary && feedbackSummary.total_reviews > 0
+        ? {
+            value: `${Number(feedbackSummary.average_rating).toFixed(1)}/5`,
+            label: t('hero.averageFromReviews', { count: feedbackSummary.total_reviews }),
+          }
+        : baseStats[1];
+    return [firstStat, secondStat].filter((s): s is { value: string; label: string } => Boolean(s?.label));
+  }, [baseStats, catalogCount, feedbackSummary, t]);
+  const teamRaw = t('hero.card.team', { returnObjects: true }) as unknown;
+  const team = Array.isArray(teamRaw) ? (teamRaw as string[]) : [];
+  const highlightsRaw = t('highlights.items', { returnObjects: true }) as unknown;
+  const highlights = Array.isArray(highlightsRaw) ? (highlightsRaw as HighlightItem[]) : [];
+  const stepsRaw = t('flow.steps', { returnObjects: true }) as unknown;
+  const steps = Array.isArray(stepsRaw)
+    ? (stepsRaw as Array<{ step: string; title: string; description: string }>)
+    : [];
+  const testimonialsRaw = t('testimonials.items', { returnObjects: true }) as unknown;
+  const testimonials = Array.isArray(testimonialsRaw)
+    ? (testimonialsRaw as Array<{ quote: string; name: string; role: string }>)
+    : [];
 
   useEffect(() => {
     const fetchFeedbackSummary = async () => {
@@ -44,7 +59,13 @@ export default function HomeScreen() {
         average_rating: Number((row as { average_rating?: number }).average_rating ?? 0),
       });
     };
+    const fetchCatalogCount = async () => {
+      const { data, error } = await supabase.rpc('public_catalog_active_option_count');
+      if (error || data == null || typeof data !== 'number') return;
+      setCatalogCount(data);
+    };
     void fetchFeedbackSummary();
+    void fetchCatalogCount();
   }, []);
 
   return (
@@ -104,7 +125,11 @@ export default function HomeScreen() {
           {highlights.map((item) => (
             <View key={item.title} style={styles.card}>
               <View style={styles.cardIcon}>
-                <Text style={styles.cardIconText}>{item.icon}</Text>
+                <Ionicons
+                  name={(item.iconName as keyof typeof Ionicons.glyphMap) || 'star-outline'}
+                  size={22}
+                  color={Colors.accent}
+                />
               </View>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardDesc}>{item.description}</Text>
@@ -257,7 +282,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardIconText: { fontSize: 24 },
   cardTitle: { color: '#fff', fontSize: 18, fontWeight: '600' },
   cardDesc: { color: Colors.white70, fontSize: 14, lineHeight: 22 },
 

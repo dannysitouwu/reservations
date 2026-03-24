@@ -8,7 +8,7 @@ const translation = {
       { to: '/reservations/mine', label: 'Mis reservas' }
     ],
     signIn: 'Iniciar sesión',
-    concierge: 'Acceso concierge',
+    Empleado: 'Contactanos',
     language: {
       label: 'Idioma',
       es: 'ES',
@@ -24,10 +24,10 @@ const translation = {
     primaryCta: 'Planear experiencia',
     secondaryCta: 'Ver catálogo',
     stats: [
-      { value: '120+', label: 'Experiencias activas en catálogo' },
+      { value: '—', label: 'Experiencias activas en catálogo' },
       { value: '< 24h', label: 'Tiempo promedio de primera respuesta' }
     ],
-    averageFromReviews: 'Promedio basado en {{count}} evaluaciones',
+    averageFromReviews: 'Basado en {{count}} evaluaciones',
     card: {
       statusTitle: 'Estado actual',
       itinerary: 'Solicitud premium',
@@ -45,17 +45,17 @@ const translation = {
       'Diseñamos itinerarios responsables que conectan playas del Pacífico, selvas nubosas y pueblos con sabor a pura vida.',
     items: [
       {
-        icon: '🌊',
+        iconName: 'people-outline',
         title: 'Red de expertos locales',
         description: 'Guías certificados que comparten secretos de Cahuita, Monteverde y las montañas de Talamanca.'
       },
       {
-        icon: '🦥',
+        iconName: 'leaf-outline',
         title: 'Encuentros sostenibles',
         description: 'Observa perezosos y guacamayas en centros de conservación con impacto directo en la comunidad.'
       },
       {
-        icon: '🌋',
+        iconName: 'compass-outline',
         title: 'Aventura y bienestar',
         description: 'Canopy sobre volcanes, rafting en el Pacuare y retiros termales en La Fortuna.'
       }
@@ -74,7 +74,7 @@ const translation = {
       {
         step: '02',
         title: 'Recibe propuestas curadas',
-        description: 'Nuestro concierge selecciona alojamientos boutique, tours certificados y traslados seguros.'
+        description: 'Nuestro Empleado selecciona alojamientos boutique, tours certificados y traslados seguros.'
       },
       {
         step: '03',
@@ -111,7 +111,7 @@ const translation = {
   cta: {
     title: '¿Listo para vivir la pura vida?',
     description:
-      'Agendemos una videollamada con tu concierge para diseñar un itinerario personalizado en menos de 24 horas.',
+      'Agendemos una videollamada con tu Empleado para diseñar un itinerario personalizado en menos de 24 horas.',
     primary: 'Comenzar reserva',
     secondary: 'Habla con un experto'
   },
@@ -122,14 +122,14 @@ const translation = {
       experiences: 'Experiencias',
       plan: 'Planificar viaje',
       status: 'Seguimiento',
-      concierge: 'Acceso concierge'
+      Empleado: 'Contactanos'
     },
     copyright: 'Todos los derechos reservados.'
   },
   booking: {
     title: 'Reserva tu experiencia',
     description:
-      'Completa los detalles para conectar con un concierge certificado que confirmará disponibilidad y coordinará traslados.',
+      'Completa los detalles para conectar con un Empleado certificado que confirmará disponibilidad y coordinará traslados.',
     selectLabel: 'Selecciona una experiencia',
     selectPlaceholder: 'Elige una experiencia en Costa Rica',
     datetimeLabel: 'Fecha y hora preferida',
@@ -173,13 +173,15 @@ const translation = {
       sectionNotes: '¿Algo especial que debamos saber?',
       dateLabel: 'Fecha',
       timeLabel: 'Hora',
+      dateHintAvailability: 'Solo se muestran días con horario publicado para esta experiencia.',
+      dateHintOpen: 'Elige una fecha en los próximos días.',
       selectDate: 'Seleccionar fecha',
       selectTime: 'Seleccionar hora',
       pickerDone: 'Listo',
       noTimesForDate: 'No hay horarios disponibles para la fecha seleccionada.',
       successTitle: '¡Reserva confirmada!',
       successDesc:
-        'Tu solicitud para {{name}} ha sido registrada. Un concierge te contactará pronto.',
+        'Tu solicitud para {{name}} ha sido registrada. Un Empleado te contactará pronto.',
       trackingLabel: 'CÓDIGO DE SEGUIMIENTO',
       trackingHint:
         'Usa este código para consultar el estado de tu reserva en cualquier momento.',
@@ -190,12 +192,33 @@ const translation = {
       pdfAlertTitle: 'PDF',
       pdfWebOnly: 'La descarga PDF por impresión está disponible en la versión web.',
       disclaimer:
-        'Al enviar, un concierge revisará tu solicitud y te contactará para confirmar disponibilidad y coordinar detalles.',
-      slotsShort: '{{count}} cupos'
+        'Al enviar, un Empleado revisará tu solicitud y te contactará para confirmar disponibilidad y coordinar detalles.',
+      slotsShort: '{{count}} cupos',
+      next: 'Siguiente',
+      back: 'Anterior',
+      pickExperienceFirst: 'Elige una experiencia en el paso anterior para ver fechas y horarios publicados.',
+      noAvailabilityPublished:
+        'Esta experiencia aún no tiene franjas publicadas en el calendario. Configura disponibilidad en el panel admin o elige otra opción.',
+      sectionPayment: 'Método de pago',
+      paymentSinpe: 'SINPE / transferencia',
+      paymentCard: 'Tarjeta',
+      paymentCash: 'Efectivo en sitio',
+      paymentCardTitle: 'Pagar con tarjeta',
+      paymentCardHint:
+        'Sandbox: usa tarjetas de prueba de Stripe (ej. 4242 4242 4242 4242, fecha futura, cualquier CVC). Ver documentación de pruebas de Stripe.',
+      paymentCardDismiss: 'Pagar después / otro método',
+      paymentCardPay: 'Pagar ahora',
+      paymentCardPaying: 'Procesando…',
+      paymentCardError: 'Error:',
+      paymentCardDone: 'Pago con tarjeta recibido.',
+      paymentCardNative:
+        'El pago con tarjeta está disponible en la versión web. Abre el sitio en el navegador o elige SINPE o efectivo.',
+      stripeNotConfigured:
+        'Pon tu pk_test en app.json → expo.extra (EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY o VITE_STRIPE_PUBLISHABLE_KEY), despliega la Edge Function stripe-payment con STRIPE_SECRET_KEY y STRIPE_PUBLISHABLE_KEY, y reinicia Expo. Mientras tanto puedes pagar con SINPE o efectivo.'
     },
     availabilityTitle: 'Disponibilidad sugerida',
     availabilityEmpty: 'Selecciona una experiencia para ver horarios recomendados.',
-    availabilityNone: 'Coordina con tu concierge para verificar disponibilidad personalizada.',
+    availabilityNone: 'Coordina con tu Empleado para verificar disponibilidad personalizada.',
     estimatedTotal: 'Total estimado',
     priceHint: 'Precio base por persona × número de personas. Se confirma al pagar.'
   },
@@ -226,7 +249,7 @@ const translation = {
     title: 'Colección de experiencias costarricenses',
     description:
       'Explora aventuras personalizadas desde el Caribe hasta el Pacífico. Cada opción incluye guías bilingües y transporte seguro.',
-    curatedTag: 'Curada',
+    curatedTag: 'Destacada',
     badges: ['Aventura', 'Naturaleza', 'Bienestar'],
     loading: 'Cargando experiencias tropicales…',
     searchLabel: 'Buscar',
@@ -235,6 +258,8 @@ const translation = {
     locationPlaceholder: 'Ej. Costa Rica',
     categoryLabel: 'Categoría',
     categoryPlaceholder: 'Ej. Aventura',
+    filterAllLocations: 'Todas las ubicaciones',
+    filterAllCategories: 'Todas las categorías',
     sortLabel: 'Ordenar',
     sortRelevance: 'Relevancia',
     sortPriceAsc: 'Precio ↑',
@@ -262,14 +287,14 @@ const translation = {
     ratingValue: '{{avg}} / 5 ({{count}} opiniones)',
     noReviews: 'Sin reseñas',
     availabilityTitle: 'Disponibilidad',
-    availabilityEmpty: 'Consulta con concierge para otras fechas.',
+    availabilityEmpty: 'Consulta con Empleado para otras fechas.',
     reviewsTitle: 'Opiniones',
     noReviewsYet: 'Aún no hay opiniones.',
     reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Sigue tu reserva',
-    description: 'Introduce tu código para ver actualizaciones y conocer a tu equipo de concierge.',
+    description: 'Introduce tu código para ver actualizaciones y conocer a tu equipo de Empleado.',
     placeholder: 'Código de confirmación',
     search: 'Consultar',
     loading: 'Buscando…',
@@ -281,7 +306,7 @@ const translation = {
     labels: {
       status: 'Estado',
       scheduled: 'Programado para',
-      concierge: 'Concierge asignado',
+      Empleado: 'Empleado asignado',
       reference: 'Código de referencia',
       guest: 'Viajero principal',
       partySize: 'Tamaño del grupo',
@@ -324,7 +349,7 @@ const translation = {
   },
   myReservations: {
     title: 'Mis reservas',
-    description: 'Consulta y sigue las experiencias que has coordinado con nuestro concierge.',
+    description: 'Consulta y sigue las experiencias que has coordinado con nuestro Empleado.',
     loading: 'Cargando tus reservas…',
     error: 'No pudimos cargar tus reservas en este momento.',
     emptyTitle: 'Aún no tienes reservas',
@@ -361,7 +386,13 @@ const translation = {
     savingFeedback: 'Guardando…',
     feedbackPending:
       'Podrás evaluar esta reserva cuando el estado sea completada.',
-    feedbackSaveError: 'No se pudo guardar la evaluación.'
+    feedbackSaveError: 'No se pudo guardar la evaluación.',
+    archiveTitle: 'Ocultar reserva',
+    archiveConfirm:
+      'Esta reserva dejará de mostrarse en tu lista. No se borra del sistema; el equipo puede seguir viéndola.',
+    archiveAction: 'Ocultar',
+    archiveCancel: 'Cancelar',
+    archiveError: 'No se pudo ocultar la reserva. Intenta de nuevo.'
   },
   contact: {
     title: 'Habla con un experto',

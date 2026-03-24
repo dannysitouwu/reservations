@@ -107,7 +107,7 @@ export function MainLayout({ children }: PropsWithChildren) {
               {t('footer.links.status')}
             </Link>
             <Link to="/contact" className="hover:text-white">
-              {t('footer.links.concierge')}
+              {t('footer.links.Empleado')}
             </Link>
           </div>
           <p className="text-xs text-white/40">

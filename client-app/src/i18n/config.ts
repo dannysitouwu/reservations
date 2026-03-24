@@ -12,7 +12,10 @@ i18n.use(initReactI18next).init({
       translation: en
     }
   },
-  lng: typeof window !== 'undefined' ? window.localStorage.getItem('reservapro_lang') || 'es' : 'es',
+  lng:
+    typeof window !== 'undefined' && window.localStorage
+      ? window.localStorage.getItem('reservapro_lang') || 'es'
+      : 'es',
   fallbackLng: 'es',
   supportedLngs: ['es', 'en'],
   nonExplicitSupportedLngs: true,

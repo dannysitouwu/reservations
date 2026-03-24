@@ -39,7 +39,13 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ReservaPro usa tu galería solo para elegir tu foto de perfil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -47,7 +53,9 @@
     },
     "extra": {
       "VITE_SUPABASE_URL": "https://hgrmnranklskhxjndabf.supabase.co",
-      "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhncm1ucmFua2xza2h4am5kYWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NTI0MjcsImV4cCI6MjA4NjMyODQyN30.JJRfTdPfWynH1DjiZZ2oBXavlAhvxb5kDhFtD-WmD7c"
+      "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhncm1ucmFua2xza2h4am5kYWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NTI0MjcsImV4cCI6MjA4NjMyODQyN30.JJRfTdPfWynH1DjiZZ2oBXavlAhvxb5kDhFtD-WmD7c",
+      "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TEPt3CunVJ3zeF6lz4cs20nADVGRupvn8Vzp9fyRR9KoWw9j3n3wvdRyBFCmqp9LKvO4Bq0elhOI4Ucdv1k98zt00P6fLaWcJ",
+      "VITE_STRIPE_PUBLISHABLE_KEY": ""
     }
   }
 }

@@ -167,7 +167,7 @@ export function AnalyticsPage() {
   );
 
   const metrics: MetricCard[] = useMemo(() => {
-    const cancellationRate = overview ? Number(overview.cancellation_rate ?? 0) * 100 : null;
+    const cancellationRate = overview ? Number(overview.cancellation_rate ?? 0) : null;
 
     return [
       {
@@ -358,6 +358,21 @@ export function AnalyticsPage() {
             {monthlyChartData.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-500">
                 Sin información suficiente para graficar.
+              </div>
+            ) : monthlyChartData.length === 1 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <p className="text-sm text-slate-500">Aún hay un único mes con datos confirmados.</p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    {monthlyChartData[0].fullMonth}
+                  </p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {formatCurrency(monthlyChartData[0].revenue)}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {monthlyChartData[0].reservations.toLocaleString('es-CR')} reservas
+                  </p>
+                </div>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

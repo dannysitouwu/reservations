@@ -9,7 +9,7 @@ const translation = {
     ],
     signIn: 'Iniciar sesión',
     mobileMenu: 'Abrir menú',
-    concierge: 'Acceso concierge',
+    Empleado: 'Contactanos',
     language: {
       label: 'Idioma',
       es: 'ES',
@@ -28,7 +28,7 @@ const translation = {
       { value: '120+', label: 'Experiencias activas en catálogo' },
       { value: '< 24h', label: 'Tiempo promedio de primera respuesta' }
     ],
-    averageFromReviews: 'Promedio basado en {{count}} evaluaciones',
+    averageFromReviews: 'Basado en {{count}} evaluaciones',
     card: {
       statusTitle: 'Estado actual',
       itinerary: 'Solicitud premium',
@@ -48,7 +48,7 @@ const translation = {
       {
         icon: '🧭',
         title: 'Coordinación experta',
-        description: 'Un concierge humano revisa tu solicitud y te contacta por el canal que prefieras.'
+        description: 'Un Empleado humano revisa tu solicitud y te contacta por el canal que prefieras.'
       },
       {
         icon: '📲',
@@ -75,7 +75,7 @@ const translation = {
       {
         step: '02',
         title: 'Recibe propuestas curadas',
-        description: 'Nuestro concierge selecciona alojamientos boutique, tours certificados y traslados seguros.'
+        description: 'Nuestro Empleado selecciona alojamientos boutique, tours certificados y traslados seguros.'
       },
       {
         step: '03',
@@ -112,7 +112,7 @@ const translation = {
   cta: {
     title: '¿Listo para vivir la pura vida?',
     description:
-      'Agendemos una videollamada con tu concierge para diseñar un itinerario personalizado en menos de 24 horas.',
+      'Agendemos una videollamada con tu Empleado para diseñar un itinerario personalizado en menos de 24 horas.',
     primary: 'Comenzar reserva',
     secondary: 'Habla con un experto'
   },
@@ -123,14 +123,14 @@ const translation = {
       experiences: 'Experiencias',
       plan: 'Planificar viaje',
       status: 'Seguimiento',
-      concierge: 'Acceso concierge'
+      Empleado: 'Contactanos'
     },
     copyright: 'Todos los derechos reservados.'
   },
   booking: {
     title: 'Reserva tu experiencia',
     description:
-      'Completa los detalles para conectar con un concierge certificado que confirmará disponibilidad y coordinará traslados.',
+      'Completa los detalles para conectar con un Empleado certificado que confirmará disponibilidad y coordinará traslados.',
     selectLabel: 'Selecciona una experiencia',
     selectPlaceholder: 'Elige una experiencia',
     datetimeLabel: 'Fecha y hora preferida',
@@ -166,7 +166,7 @@ const translation = {
     },
     availabilityTitle: 'Disponibilidad sugerida',
     availabilityEmpty: 'Selecciona una experiencia para ver horarios recomendados.',
-    availabilityNone: 'Coordina con tu concierge para verificar disponibilidad personalizada.',
+    availabilityNone: 'Coordina con tu Empleado para verificar disponibilidad personalizada.',
     estimatedTotal: 'Total estimado',
     priceHint: 'Precio base por persona × número de personas. Se confirma al pagar.'
   },
@@ -197,7 +197,7 @@ const translation = {
     title: 'Colección de experiencias y servicios',
     description:
       'Explora opciones configurables para eventos, bienestar y experiencias privadas. Puedes reservar en minutos.',
-    curatedTag: 'Curada',
+    curatedTag: 'Destacada',
     badges: ['Aventura', 'Naturaleza', 'Bienestar'],
     bookNow: 'Reservar ahora',
     loading: 'Cargando experiencias tropicales…',
@@ -232,14 +232,14 @@ const translation = {
     ratingValue: '{{avg}} / 5 ({{count}} opiniones)',
     noReviews: 'Sin reseñas aún',
     availabilityTitle: 'Disponibilidad publicada',
-    availabilityEmpty: 'Consulta con concierge para fechas especiales.',
+    availabilityEmpty: 'Consulta con Empleado para fechas especiales.',
     reviewsTitle: 'Opiniones de viajeros',
     noReviewsYet: 'Sé el primero en vivir esta experiencia.',
     reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Sigue tu reserva',
-    description: 'Introduce tu código para ver actualizaciones y conocer a tu equipo de concierge.',
+    description: 'Introduce tu código para ver actualizaciones y conocer a tu equipo de Empleado.',
     placeholder: 'Código de confirmación',
     search: 'Consultar',
     loading: 'Buscando…',
@@ -251,7 +251,7 @@ const translation = {
     labels: {
       status: 'Estado',
       scheduled: 'Programado para',
-      concierge: 'Concierge asignado',
+      Empleado: 'Empleado asignado',
       reference: 'Código de referencia',
       guest: 'Viajero principal',
       partySize: 'Tamaño del grupo',
@@ -301,7 +301,7 @@ const translation = {
   },
   myReservations: {
     title: 'Mis reservas',
-    description: 'Consulta y sigue las experiencias que has coordinado con nuestro concierge.',
+    description: 'Consulta y sigue las experiencias que has coordinado con nuestro Empleado.',
     loading: 'Cargando tus reservas…',
     error: 'No pudimos cargar tus reservas en este momento.',
     emptyTitle: 'Aún no tienes reservas',

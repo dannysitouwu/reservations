@@ -1,10 +1,10 @@
-import { FormEvent, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ReservationStatus } from '../types/reservation';
-import { supabase } from '../lib/supabaseClient';
 import { Container } from '../components/ui/Container';
 import { SectionHeading } from '../components/ui/SectionHeading';
+import { supabase } from '../lib/supabaseClient';
+import { ReservationStatus } from '../types/reservation';
 
 type ReservationSearchResult = {
   id: string;
@@ -120,7 +120,7 @@ export function ReservationStatusPage() {
                 </p>
               </div>
               <div>
-                <p className="text-white/50">{t('statusPage.labels.concierge')}</p>
+                <p className="text-white/50">{t('statusPage.labels.Empleado')}</p>
                 <p className="text-lg font-semibold text-white">
                   {result.assigned_worker_name ?? '—'}
                 </p>

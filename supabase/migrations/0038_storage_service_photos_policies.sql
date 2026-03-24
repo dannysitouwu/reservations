@@ -27,7 +27,7 @@ CREATE POLICY "service_photos_admin_insert"
       SELECT 1
       FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('admin', 'super_admin')
+        AND p.role::text IN ('admin', 'super_admin')
     )
   );
 
@@ -42,7 +42,7 @@ CREATE POLICY "service_photos_admin_update"
       SELECT 1
       FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('admin', 'super_admin')
+        AND p.role::text IN ('admin', 'super_admin')
     )
   );
 
@@ -57,6 +57,6 @@ CREATE POLICY "service_photos_admin_delete"
       SELECT 1
       FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('admin', 'super_admin')
+        AND p.role::text IN ('admin', 'super_admin')
     )
   );

@@ -1,4 +1,4 @@
-import { BarChart3, CalendarClock, LayoutDashboard, LogOut, Plus, Users2 } from 'lucide-react';
+import { BarChart3, CalendarClock, LayoutDashboard, LogOut, Plus, Users2, Package } from 'lucide-react';
 import { PropsWithChildren } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
@@ -9,6 +9,7 @@ import { useSupabase } from '../providers/SupabaseProvider';
 const navItems = [
   { to: '/', label: 'Resumen', icon: LayoutDashboard },
   { to: '/reservations', label: 'Reservas', icon: CalendarClock },
+  { to: '/services', label: 'Servicios', icon: Package },
   { to: '/users', label: 'Clientes', icon: Users2 },
   { to: '/analytics', label: 'Analítica', icon: BarChart3 }
 ];

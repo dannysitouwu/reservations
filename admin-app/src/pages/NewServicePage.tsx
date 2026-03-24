@@ -1,15 +1,28 @@
 import { Loader2, Upload, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { supabase } from '../lib/supabaseClient';
 
+const PRESET_CATEGORIES = [
+  'Aventura',
+  'Naturaleza',
+  'Cultura',
+  'Relax',
+  'Gastronomía',
+  'Bienestar',
+  'Familiar',
+  'Romántica',
+  'Eco / outdoor',
+];
+
 type NewServiceForm = {
   name: string;
   description: string;
-  price_crc: string;
+  locationLabel: string;
+  categoryLabel: string;
   price_usd: string;
   photoFile: File | null;
   photoPreview: string | null;
@@ -17,10 +30,14 @@ type NewServiceForm = {
 };
 
 export function NewServicePage() {
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(PRESET_CATEGORIES);
+  /** Evita que al elegir "Otra categoría" el select vuelva a "" y oculte el campo de texto. */
+  const [categoryEntryMode, setCategoryEntryMode] = useState<'preset' | 'custom'>('preset');
   const [form, setForm] = useState<NewServiceForm>({
     name: '',
     description: '',
-    price_crc: '',
+    locationLabel: '',
+    categoryLabel: '',
     price_usd: '',
     photoFile: null,
     photoPreview: null,
@@ -29,6 +46,29 @@ export function NewServicePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.from('services').select('category_label');
+      const fromDb = [
+        ...new Set(
+          (data ?? [])
+            .map((r: { category_label: string | null }) => (r.category_label ?? '').trim())
+            .filter(Boolean)
+        ),
+      ];
+      const merged = [...new Set([...PRESET_CATEGORIES, ...fromDb])].sort((a, b) =>
+        a.localeCompare(b, 'es', { sensitivity: 'base' })
+      );
+      setCategoryOptions(merged);
+    })();
+  }, []);
+
+  const categoryTrim = form.categoryLabel.trim();
+  const categoryInList = Boolean(categoryTrim && categoryOptions.includes(categoryTrim));
+  const categorySelectValue =
+    categoryEntryMode === 'custom' ? '__custom__' : !categoryTrim ? '' : categoryInList ? categoryTrim : '__custom__';
+  const showCategoryCustom = categoryEntryMode === 'custom' || (!!categoryTrim && !categoryInList);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,6 +159,8 @@ export function NewServicePage() {
           service_data: {
             name: form.name.trim(),
             description: form.description.trim() || null,
+            location_label: form.locationLabel.trim() || null,
+            category_label: form.categoryLabel.trim() || null,
             is_active: true,
             metadata: {}
           }
@@ -135,7 +177,7 @@ export function NewServicePage() {
         .rpc('admin_create_service_option', {
           option_data: {
             service_id: serviceId,
-            name: `${form.name} - Opción Estándar`,
+            name: form.name.trim(),
             description: null,
             duration_minutes: parseInt(form.durationMinutes),
             base_price: priceInCents,  // ← CENTS
@@ -150,19 +192,37 @@ export function NewServicePage() {
         throw new Error(optionError?.message || optionResult?.error || 'Error creating service option');
       }
 
+      const createdName = form.name.trim();
+
       // Reset form
       setForm({
         name: '',
         description: '',
-        price_crc: '',
+        locationLabel: '',
+        categoryLabel: '',
         price_usd: '',
         photoFile: null,
         photoPreview: null,
         durationMinutes: '60'
       });
 
-      setSuccess(`✓ Servicio "${form.name}" creado exitosamente`);
+      setSuccess(`✓ Servicio "${createdName}" creado exitosamente`);
+      setCategoryEntryMode('preset');
       setTimeout(() => setSuccess(''), 3000);
+
+      const { data: catRows } = await supabase.from('services').select('category_label');
+      const fromDb = [
+        ...new Set(
+          (catRows ?? [])
+            .map((r: { category_label: string | null }) => (r.category_label ?? '').trim())
+            .filter(Boolean)
+        ),
+      ];
+      setCategoryOptions(
+        [...new Set([...PRESET_CATEGORIES, ...fromDb])].sort((a, b) =>
+          a.localeCompare(b, 'es', { sensitivity: 'base' })
+        )
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear servicio');
     } finally {
@@ -213,29 +273,78 @@ export function NewServicePage() {
             {/* Pricing */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="price_usd">Precio USD *</Label>
+                <Label htmlFor="location_label">Ubicación</Label>
                 <Input
-                  id="price_usd"
-                  type="number"
-                  step="0.01"
-                  value={form.price_usd}
-                  onChange={(e) => setForm({ ...form, price_usd: e.target.value })}
-                  placeholder="99.99"
+                  id="location_label"
+                  value={form.locationLabel}
+                  onChange={(e) => setForm({ ...form, locationLabel: e.target.value })}
+                  placeholder="Ej: Monteverde, La Fortuna"
                   disabled={loading}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price_crc">Precio CRC (opcional)</Label>
-                <Input
-                  id="price_crc"
-                  type="number"
-                  step="0.01"
-                  value={form.price_crc}
-                  onChange={(e) => setForm({ ...form, price_crc: e.target.value })}
-                  placeholder="ej: 50000"
+                <Label htmlFor="category_select">Categoría</Label>
+                <select
+                  id="category_select"
+                  value={categorySelectValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      setCategoryEntryMode('preset');
+                      setForm((prev) => ({ ...prev, categoryLabel: '' }));
+                      return;
+                    }
+                    if (v === '__custom__') {
+                      setCategoryEntryMode('custom');
+                      setForm((prev) => ({ ...prev, categoryLabel: '' }));
+                      return;
+                    }
+                    setCategoryEntryMode('preset');
+                    setForm((prev) => ({ ...prev, categoryLabel: v }));
+                  }}
                   disabled={loading}
-                />
+                  className="h-10 w-full rounded-lg border border-surface-border bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">— Seleccionar —</option>
+                  {categoryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="__custom__">Otra categoría (escribir)…</option>
+                </select>
+                {showCategoryCustom && (
+                  <div className="pt-1">
+                    <Label htmlFor="category_custom" className="text-xs text-slate-500">
+                      Nombre exacto (aparecerá en el catálogo)
+                    </Label>
+                    <Input
+                      id="category_custom"
+                      value={form.categoryLabel}
+                      onChange={(e) => setForm({ ...form, categoryLabel: e.target.value })}
+                      placeholder="Ej. Avistamiento de aves"
+                      disabled={loading}
+                      className="mt-1"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Tip: si la usarás en más servicios, escribe siempre el mismo texto para poder filtrar.
+                    </p>
+                  </div>
+                )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price_usd">Precio USD *</Label>
+              <Input
+                id="price_usd"
+                type="number"
+                step="0.01"
+                value={form.price_usd}
+                onChange={(e) => setForm({ ...form, price_usd: e.target.value })}
+                placeholder="99.99"
+                disabled={loading}
+              />
             </div>
 
             {/* Duration */}
@@ -252,40 +361,43 @@ export function NewServicePage() {
             </div>
 
             {/* Photo Upload */}
-            <div className="space-y-3">
-              <Label>Foto del servicio</Label>
-              {form.photoPreview ? (
-                <div className="relative inline-block">
-                  <img
-                    src={form.photoPreview}
-                    alt="Préview"
-                    className="h-32 w-32 rounded-lg border border-surface-border object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    disabled={loading}
-                    className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 px-6 py-8 text-center hover:border-slate-400">
-                  <Upload className="h-5 w-5 text-slate-400" />
-                  <div>
-                    <p className="font-medium text-slate-900">Click para seleccionar imagen</p>
-                    <p className="text-xs text-slate-500">JPG, PNG | máx 5MB</p>
+            <div className="flex w-full flex-col gap-2">
+              <Label className="block">Foto del servicio</Label>
+              <div className="w-full">
+                {form.photoPreview ? (
+                  <div className="relative inline-block align-top">
+                    <img
+                      src={form.photoPreview}
+                      alt="Vista previa"
+                      className="h-36 w-36 rounded-lg border border-surface-border object-cover sm:h-40 sm:w-40"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      disabled={loading}
+                      className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                      aria-label="Quitar imagen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoSelect}
-                    disabled={loading}
-                    className="hidden"
-                  />
-                </label>
-              )}
+                ) : (
+                  <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-8 text-center hover:border-slate-400 sm:flex-row sm:text-left">
+                    <Upload className="h-5 w-5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="font-medium text-slate-900">Clic para seleccionar imagen</p>
+                      <p className="text-xs text-slate-500">JPG, PNG | máx 5MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoSelect}
+                      disabled={loading}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* Error/Success Messages */}

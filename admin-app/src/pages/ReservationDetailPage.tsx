@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { formatCurrency } from '../lib/formatCurrency';
 import { supabase } from '../lib/supabaseClient';
 import type { ReservationDetail } from '../types/reservation';
+import { AdminStripeCardPayment } from '../components/AdminStripeCardPayment';
 
 // Simplified state transitions
 const stateInfo: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -20,7 +21,6 @@ const stateInfo: Record<string, { label: string; color: string; icon: React.Reac
 
 const validTransitions: Record<string, { status: string; label: string; color: string }[]> = {
   'pending': [
-    { status: 'paid', label: 'Marcar como Pagado', color: 'bg-green-600 hover:bg-green-700' },
     { status: 'cancelled', label: 'Cancelar', color: 'bg-red-600 hover:bg-red-700' }
   ],
   'paid': [
@@ -42,9 +42,16 @@ export function ReservationDetailPage() {
   const [paymentMethod, setPaymentMethod] = useState('sinpe');
   const [externalRef, setExternalRef] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [buyerPaymentPref, setBuyerPaymentPref] = useState<string | null>(null);
+  const [savingPref, setSavingPref] = useState(false);
+  const [lastPayment, setLastPayment] = useState<{
+    payment_method: string | null;
+    transaction_id: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const fetchReservation = async () => {
+      if (!id) return;
       try {
         // Query reservations table directly since the view might not exist after migration
         const { data: res, error: err } = await supabase
@@ -80,17 +87,33 @@ export function ReservationDetailPage() {
         if (res) {
           const row = res as Record<string, unknown>;
           const meta = (row.metadata as Record<string, unknown> | null) ?? {};
+          const prefRaw = meta.preferred_payment_method;
+          const pref =
+            typeof prefRaw === 'string' && ['sinpe', 'card', 'cash'].includes(prefRaw)
+              ? prefRaw
+              : null;
+          setBuyerPaymentPref(pref);
+          const rowStatus = row.status as string;
+          if (rowStatus === 'pending') {
+            setPaymentMethod(pref ?? 'sinpe');
+          }
           const ps = meta.party_size;
           const partySize =
             typeof ps === 'number' ? ps : typeof ps === 'string' ? parseInt(ps, 10) || 1 : 1;
-          const so = row.service_options as
+          const soRaw = row.service_options as
             | {
                 name?: string;
                 duration_minutes?: number;
                 services?: { name?: string } | { name?: string }[];
               }
             | null
-            | undefined;
+            | undefined
+            | Array<{
+                name?: string;
+                duration_minutes?: number;
+                services?: { name?: string } | { name?: string }[];
+              }>;
+          const so = Array.isArray(soRaw) ? soRaw[0] : soRaw;
           const svc = so?.services;
           const serviceCategoryName = Array.isArray(svc) ? svc[0]?.name : svc?.name;
           const transformed: ReservationDetail = {
@@ -114,10 +137,27 @@ export function ReservationDetailPage() {
             internal_notes: (row.internal_notes as string | null) ?? null,
             buyer_phone: (row.profiles as { phone?: string } | null)?.phone ?? null,
             contact_preference: null,
-            party_size: partySize
+            party_size: partySize,
+            preferred_payment_method: pref
           };
           setReservation(transformed);
-          setInternalNotes(res.internal_notes || '');
+          setInternalNotes((row.internal_notes as string | null) || '');
+
+          const { data: payRows } = await supabase
+            .from('reservation_payments')
+            .select('payment_method, transaction_id')
+            .eq('reservation_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const pr = payRows?.[0] as { payment_method?: string; transaction_id?: string } | undefined;
+          if (pr) {
+            setLastPayment({
+              payment_method: pr.payment_method ?? null,
+              transaction_id: pr.transaction_id ?? null,
+            });
+          } else {
+            setLastPayment(null);
+          }
         }
       } catch (err) {
         console.error('Error fetching reservation:', err);
@@ -148,17 +188,20 @@ export function ReservationDetailPage() {
     };
   }, [id]);
 
+  const handleStripePaid = useCallback(() => {
+    setError('');
+    setReservation((prev) => (prev ? { ...prev, status: 'paid' } : prev));
+  }, []);
+
+  const handleStripeError = useCallback((msg: string) => {
+    setError(msg);
+  }, []);
+
   const handleStatusChange = async (newStatus: string) => {
     if (!id || !reservation) return;
     if (newStatus === 'cancelled') {
       const ok = window.confirm(
         '¿Cancelar esta reserva? El cliente verá el estado como cancelado.'
-      );
-      if (!ok) return;
-    }
-    if (newStatus === 'paid') {
-      const ok = window.confirm(
-        '¿Marcar esta reserva como pagada? Si registras el cobro con comprobante, usa el formulario “Registrar pago” debajo.'
       );
       if (!ok) return;
     }
@@ -198,10 +241,6 @@ export function ReservationDetailPage() {
       setError('La reserva no tiene monto total definido');
       return;
     }
-    const ok = window.confirm(
-      '¿Confirmar el pago y marcar la reserva como pagada? Se registrará el movimiento en pagos.'
-    );
-    if (!ok) return;
     setRecordingPayment(true);
     setError('');
     try {
@@ -226,6 +265,32 @@ export function ReservationDetailPage() {
       setError(e instanceof Error ? e.message : 'Error al registrar pago');
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const handleSaveBuyerPref = async () => {
+    if (!id || !reservation || reservation.status !== 'pending') return;
+    setSavingPref(true);
+    setError('');
+    try {
+      const { data, error: err } = await supabase.rpc('admin_set_preferred_payment_method', {
+        p_reservation_id: id,
+        p_method: paymentMethod,
+      });
+      if (err) {
+        setError(err.message);
+      } else {
+        const payload = data as { success?: boolean; error?: string } | null;
+        if (payload && payload.success === false) {
+          setError(payload.error ?? 'No se pudo guardar la preferencia');
+        } else {
+          setBuyerPaymentPref(paymentMethod);
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al guardar');
+    } finally {
+      setSavingPref(false);
     }
   };
 
@@ -261,7 +326,20 @@ export function ReservationDetailPage() {
   }
 
   const availableTransitions = validTransitions[reservation.status] || [];
-  const stateData = stateInfo[reservation.status];
+  const stateData =
+    stateInfo[reservation.status] ??
+    ({
+      label: String(reservation.status),
+      color: 'bg-slate-100 text-slate-800',
+      icon: null,
+    } as const);
+
+  const payMethodLabel = (m: string | null | undefined) => {
+    if (m === 'sinpe') return 'SINPE / transferencia';
+    if (m === 'card') return 'Tarjeta (Stripe u online)';
+    if (m === 'cash') return 'Efectivo';
+    return m && m.length > 0 ? m : '—';
+  };
 
   return (
     <section className="space-y-6">
@@ -299,11 +377,15 @@ export function ReservationDetailPage() {
       {reservation.status === 'pending' ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Registrar pago (SINPE / efectivo)</CardTitle>
+            <CardTitle className="text-base">Cobro y método de pago</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 max-w-md">
+            <p className="text-sm text-slate-600">
+              El cliente indicó:{' '}
+              <span className="font-semibold text-slate-900">{payMethodLabel(buyerPaymentPref)}</span>
+            </p>
             <div>
-              <Label htmlFor="pay_method">Método</Label>
+              <Label htmlFor="pay_method">Registrar cobro como</Label>
               <select
                 id="pay_method"
                 value={paymentMethod}
@@ -312,16 +394,37 @@ export function ReservationDetailPage() {
               >
                 <option value="sinpe">SINPE móvil / transferencia</option>
                 <option value="cash">Efectivo</option>
-                <option value="card">Tarjeta (manual)</option>
+                <option value="card">Tarjeta (Stripe en línea)</option>
               </select>
             </div>
+            {paymentMethod === 'card' && id ? (
+              <AdminStripeCardPayment
+                key={`stripe-${id}`}
+                reservationId={id}
+                onSuccess={handleStripePaid}
+                onError={handleStripeError}
+              />
+            ) : null}
+            {paymentMethod === 'card' ? (
+              <p className="text-xs text-slate-500">
+                También puedes registrar un cobro manual abajo (terminal físico u otra referencia).
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={savingPref || recordingPayment || paymentMethod === buyerPaymentPref}
+              onClick={() => void handleSaveBuyerPref()}
+            >
+              {savingPref ? 'Guardando…' : 'Solo actualizar indicación del cliente'}
+            </Button>
             <div>
               <Label htmlFor="pay_ref">Referencia externa (opcional)</Label>
               <Input
                 id="pay_ref"
                 value={externalRef}
                 onChange={(e) => setExternalRef(e.target.value)}
-                placeholder="Número de comprobante"
+                placeholder="Comprobante SINPE, referencia, o ID Stripe"
                 disabled={recordingPayment}
               />
             </div>
@@ -333,7 +436,8 @@ export function ReservationDetailPage() {
               {recordingPayment ? 'Registrando…' : 'Confirmar pago y marcar como pagada'}
             </Button>
             <p className="text-xs text-slate-500">
-              Se guarda el movimiento en <code className="text-xs">reservation_payments</code> y se encola notificación al cliente.
+              Se guarda en <code className="text-xs">reservation_payments</code> y se notifica al cliente. Para tarjeta vía
+              Stripe, el cliente paga desde la app; aquí puedes registrar un cobro manual con referencia si aplica.
             </p>
           </CardContent>
         </Card>
@@ -385,6 +489,16 @@ export function ReservationDetailPage() {
                 <p className="text-xs uppercase text-slate-500">Monto</p>
                 <p className="text-sm font-semibold text-slate-900">
                   {formatCurrency((reservation.total_amount || 0) / 100, 'USD')}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-slate-500">Pago registrado</p>
+                <p className="text-sm text-slate-600">
+                  {reservation.status === 'paid' || reservation.status === 'fulfilled'
+                    ? lastPayment
+                      ? `${payMethodLabel(lastPayment.payment_method)}${lastPayment.transaction_id ? ` · ${lastPayment.transaction_id}` : ''}`
+                      : 'Sin movimiento en reservation_payments'
+                    : payMethodLabel(reservation.preferred_payment_method)}
                 </p>
               </div>
             </CardContent>

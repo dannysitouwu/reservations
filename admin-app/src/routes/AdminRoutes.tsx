@@ -9,6 +9,7 @@ import { NewServicePage } from '../pages/NewServicePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ReservationDetailPage } from '../pages/ReservationDetailPage';
 import { ReservationsPage } from '../pages/ReservationsPage';
+import { ServicesPage } from '../pages/ServicesPage';
 import { UserManagementPage } from '../pages/UserManagementPage';
 import { useSupabase } from '../providers/SupabaseProvider';
 
@@ -40,9 +41,10 @@ function ProtectedRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/reservations" element={<ReservationsPage />} />
         <Route path="/reservations/:id" element={<ReservationDetailPage />} />
+        <Route path="/services" element={<ServicesPage />} />
+        <Route path="/services/new" element={<NewServicePage />} />
         <Route path="/users" element={<UserManagementPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/services/new" element={<NewServicePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AdminLayout>

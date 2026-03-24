@@ -6,12 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { formatCurrency } from '../lib/formatCurrency';
 import { supabase } from '../lib/supabaseClient';
 import type { Reservation } from '../types/reservation';
+import { statusDisplay } from '../utils/status';
 
 type DashboardMetrics = {
   pending_count: number;
   confirmed_count: number;
+  cancelled_count: number;
   revenue_month: number;
-  avg_response_min: number;
+  /** null = aún no hay métrica implementada en el sistema */
+  avg_response_min: number | null;
 };
 
 export function DashboardPage() {
@@ -20,8 +23,22 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showBriefingModal, setShowBriefingModal] = useState(false);
   const [briefingTime, setBriefingTime] = useState('09:00');
+  const [briefingSaved, setBriefingSaved] = useState(false);
+  const [briefingTestMessage, setBriefingTestMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (showBriefingModal) {
+      setBriefingTestMessage(null);
+    }
+  }, [showBriefingModal]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('briefingTime');
+    if (saved) {
+      setBriefingTime(saved);
+      setBriefingSaved(true);
+    }
+
     const fetchData = async () => {
       try {
         // Fetch ALL reservations to calculate metrics
@@ -40,6 +57,7 @@ export function DashboardPage() {
           const confirmed = allReservations.filter((r) =>
             ['paid', 'fulfilled'].includes(r.status)
           );
+          const cancelled = allReservations.filter((r) => r.status === 'cancelled');
           const thisMonthReservations = allReservations.filter((r) => {
             const date = new Date(r.created_at);
             return (
@@ -53,8 +71,9 @@ export function DashboardPage() {
           setMetrics({
             pending_count: pending.length,
             confirmed_count: confirmed.length,
+            cancelled_count: cancelled.length,
             revenue_month: revenue,
-            avg_response_min: 0
+            avg_response_min: null,
           });
         }
 
@@ -100,9 +119,110 @@ export function DashboardPage() {
     };
   }, []);
 
-  const handleSaveBriefing = () => {
+  // Ventana de 3 min tras la hora configurada: si el navegador retrasa timers en segundo plano,
+  // no perdemos el aviso. Intervalo corto + visibilitychange para al volver a la pestaña.
+  useEffect(() => {
+    if (!briefingTime) return;
+
+    const WINDOW_MS = 3 * 60 * 1000;
+
+    const tick = () => {
+      const nextReminderKey = `briefingReminder-${new Date().toDateString()}`;
+      if (localStorage.getItem(nextReminderKey) === '1') return;
+
+      const [targetH, targetM] = briefingTime.split(':').map(Number);
+      if (Number.isNaN(targetH) || Number.isNaN(targetM)) return;
+
+      const now = new Date();
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetH, targetM, 0, 0);
+      const diffMs = now.getTime() - target.getTime();
+      if (diffMs < 0 || diffMs > WINDOW_MS) return;
+
+      if (!('Notification' in window)) return;
+
+      if (Notification.permission === 'granted') {
+        try {
+          new Notification('ReservaPro', {
+            body: `Recordatorio: revisar el panel (${briefingTime}).`,
+            tag: 'reservapro-briefing',
+          });
+        } catch {
+          /* ignore */
+        }
+        localStorage.setItem(nextReminderKey, '1');
+      } else if (Notification.permission === 'default') {
+        void Notification.requestPermission();
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 15_000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [briefingTime]);
+
+  const handleSaveBriefing = async () => {
     localStorage.setItem('briefingTime', briefingTime);
+    setBriefingSaved(true);
     setShowBriefingModal(false);
+    if (!('Notification' in window)) return;
+    try {
+      const perm =
+        Notification.permission === 'default'
+          ? await Notification.requestPermission()
+          : Notification.permission;
+      if (perm === 'granted') {
+        new Notification('ReservaPro', {
+          body: 'Notificaciones listas. Te avisaremos cada día a la hora que elegiste mientras esta pestaña siga abierta.',
+          tag: 'reservapro-briefing-setup',
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleBriefingTestNow = async () => {
+    setBriefingTestMessage(null);
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setBriefingTestMessage('Este navegador no soporta la API de notificaciones.');
+      return;
+    }
+    try {
+      let perm = Notification.permission;
+      if (perm === 'default') {
+        perm = await Notification.requestPermission();
+      }
+      if (perm === 'denied') {
+        setBriefingTestMessage(
+          'Permiso bloqueado: en la barra de direcciones, abre el menú del sitio (candado) y permite notificaciones para este origen.',
+        );
+        return;
+      }
+      if (perm !== 'granted') {
+        setBriefingTestMessage('No se obtuvo permiso para mostrar notificaciones.');
+        return;
+      }
+      const tag = `reservapro-briefing-test-${Date.now()}`;
+      new Notification('ReservaPro', {
+        body: `Prueba: recordatorio diario (${briefingTime}).`,
+        tag,
+        requireInteraction: false,
+      });
+      setBriefingTestMessage(
+        'Listo: revisa el centro de notificaciones (macOS: esquina superior derecha). Si no ves nada, comprueba “No molestar”.',
+      );
+    } catch (e) {
+      setBriefingTestMessage(
+        e instanceof Error ? e.message : 'No se pudo mostrar la notificación. Prueba otro navegador o HTTPS.',
+      );
+    }
   };
 
   return (
@@ -112,18 +232,37 @@ export function DashboardPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Resumen operativo</h1>
           <p className="text-sm text-slate-500">Analiza el estado de reservas, ingresos y tiempos de respuesta del equipo.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="border-primary/20 text-primary">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Badge variant="outline" className="border-primary/20 text-primary w-fit">
             Actualizado {new Date().toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
           </Badge>
-          <Button
-            variant="secondary"
-            onClick={() => setShowBriefingModal(true)}
-            className="flex items-center gap-2"
-          >
-            <Clock className="h-4 w-4" />
-            Programar briefing diario
-          </Button>
+          <div className="flex flex-col gap-1 sm:items-end">
+            <Button
+              variant="secondary"
+              onClick={() => setShowBriefingModal(true)}
+              className="flex h-auto flex-col items-stretch gap-1 py-2.5 text-left sm:min-w-[240px]"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Clock className="h-4 w-4 shrink-0" />
+                Recordatorio diario
+              </span>
+              <span className="text-xs font-normal text-slate-500">
+                Hora: <span className="font-mono font-medium text-emerald-700">{briefingTime}</span>
+                {' · '}
+                {briefingSaved ? 'Configurado' : 'Pulsa para elegir hora'}
+              </span>
+            </Button>
+            {typeof window !== 'undefined' && 'Notification' in window ? (
+              <p className="max-w-xs text-[11px] leading-snug text-slate-400 sm:text-right">
+                {Notification.permission === 'denied' && (
+                  <>Permiso bloqueado: revisa el candado del sitio en la barra del navegador y permite notificaciones.</>
+                )}
+                {Notification.permission === 'default' && (
+                  <>Tras guardar, el navegador pedirá permiso; acéptalo para recibir el aviso diario.</>
+                )}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -132,8 +271,7 @@ export function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Programar briefing diario</CardTitle>
-              <CardDescription>Establece la hora para tu reunión diaria de estado</CardDescription>
+              <CardTitle>Recordatorio en el navegador</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -146,13 +284,33 @@ export function DashboardPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <Button onClick={handleSaveBriefing} className="flex-1 bg-primary text-white hover:bg-primary/90">
+                <Button
+                  onClick={() => void handleSaveBriefing()}
+                  className="flex-1 bg-primary text-white hover:bg-primary/90"
+                >
                   Guardar
                 </Button>
                 <Button onClick={() => setShowBriefingModal(false)} variant="secondary" className="flex-1">
                   Cancelar
                 </Button>
               </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => void handleBriefingTestNow()}
+              >
+                Probar notificación ahora
+              </Button>
+              {briefingTestMessage ? (
+                <p className="text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2">
+                  {briefingTestMessage}
+                </p>
+              ) : null}
+              <p className="text-xs text-slate-500">
+                El aviso diario solo puede dispararse con esta pestaña abierta en los ~3 minutos posteriores a la hora
+                elegida; es distinto de otras alertas del sistema. Usa “Probar notificación ahora” para validar permisos.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -194,9 +352,9 @@ export function DashboardPage() {
           <CardHeader>
             <p className="text-xs uppercase text-slate-500">Tiempo medio de respuesta</p>
             <CardTitle className="text-3xl font-bold text-slate-900">
-              {metrics?.avg_response_min || '—'} min
+              {metrics?.avg_response_min != null ? `${metrics.avg_response_min} min` : 'Sin datos'}
             </CardTitle>
-            <CardDescription className="text-xs">Objetivo &lt; 45 min</CardDescription>
+            <CardDescription className="text-xs">Objetivo operativo &lt; 45 min.</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -233,8 +391,8 @@ export function DashboardPage() {
                     <p className="font-semibold text-slate-900">
                       {formatCurrency(((reservation as any).total_amount ?? 0) / 100, 'USD')}
                     </p>
-                    <Badge variant="outline" className="mt-1 text-xs capitalize">
-                      {(reservation as any).status}
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {statusDisplay[(reservation as Reservation).status] ?? (reservation as Reservation).status}
                     </Badge>
                   </div>
                 </div>
@@ -248,12 +406,33 @@ export function DashboardPage() {
             <CardTitle>Estado del equipo</CardTitle>
             <CardDescription>Disponibilidad y carga de trabajo actual</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-surface-border bg-white p-3">
+              <p className="text-xs uppercase text-slate-500">Resumen por estado</p>
+              {metrics ? (
+                <ul className="mt-2 space-y-2 text-sm text-slate-700">
+                  <li className="flex justify-between gap-2">
+                    <span>Pendientes</span>
+                    <span className="font-semibold text-amber-700">{metrics.pending_count}</span>
+                  </li>
+                  <li className="flex justify-between gap-2">
+                    <span>Confirmadas / en curso</span>
+                    <span className="font-semibold text-emerald-700">{metrics.confirmed_count}</span>
+                  </li>
+                  <li className="flex justify-between gap-2">
+                    <span>Canceladas</span>
+                    <span className="font-semibold text-slate-600">{metrics.cancelled_count}</span>
+                  </li>
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">Sin datos disponibles</p>
+              )}
+            </div>
             <div className="rounded-lg border border-surface-border bg-white p-3">
               <p className="text-xs uppercase text-slate-500">Tasa de confirmación</p>
               {metrics && metrics.pending_count + metrics.confirmed_count > 0 ? (
                 <div className="mt-2">
-                  <div className="h-2 rounded-full bg-slate-200">
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                     <div
                       className="h-2 rounded-full bg-emerald-500"
                       style={{
@@ -267,11 +446,11 @@ export function DashboardPage() {
                     {Math.round(
                       (metrics.confirmed_count / (metrics.pending_count + metrics.confirmed_count)) * 100
                     )}
-                    % confirmadas
+                    % confirmadas sobre pendientes + confirmadas
                   </p>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-slate-500">Sin datos disponibles</p>
+                <p className="mt-2 text-sm text-slate-500">Sin pendientes ni confirmadas para calcular la tasa.</p>
               )}
             </div>
           </CardContent>

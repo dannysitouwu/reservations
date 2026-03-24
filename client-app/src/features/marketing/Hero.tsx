@@ -94,7 +94,7 @@ export function Hero() {
               >
                 <span>
                   AI-powered
-                  <br /> concierge
+                  <br /> Empleado
                 </span>
               </motion.div>
 

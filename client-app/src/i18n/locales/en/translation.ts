@@ -9,7 +9,7 @@ const translation = {
     ],
     signIn: 'Sign in',
     mobileMenu: 'Open menu',
-    concierge: 'Concierge access',
+    Empleado: 'Empleado access',
     language: {
       label: 'Language',
       es: 'ES',
@@ -28,7 +28,7 @@ const translation = {
       { value: '120+', label: 'Active catalog experiences' },
       { value: '< 24h', label: 'Average first response time' }
     ],
-    averageFromReviews: 'Average based on {{count}} reviews',
+    averageFromReviews: 'Based on {{count}} reviews',
     card: {
       statusTitle: 'Current status',
       itinerary: 'Premium request',
@@ -48,7 +48,7 @@ const translation = {
       {
         icon: '🧭',
         title: 'Expert coordination',
-        description: 'A human concierge reviews each request and reaches you through your preferred channel.'
+        description: 'A human Empleado reviews each request and reaches you through your preferred channel.'
       },
       {
         icon: '📲',
@@ -75,7 +75,7 @@ const translation = {
       {
         step: '02',
         title: 'Receive curated proposals',
-        description: 'Your concierge aligns boutique stays, certified tours, and safe transfers.'
+        description: 'Your Empleado aligns boutique stays, certified tours, and safe transfers.'
       },
       {
         step: '03',
@@ -112,7 +112,7 @@ const translation = {
   cta: {
     title: 'Ready to live the pura vida?',
     description:
-      'Schedule a video call with your concierge to design a personalized itinerary in under 24 hours.',
+      'Schedule a video call with your Empleado to design a personalized itinerary in under 24 hours.',
     primary: 'Start booking',
     secondary: 'Talk to an expert'
   },
@@ -123,14 +123,14 @@ const translation = {
       experiences: 'Experiences',
       plan: 'Plan trip',
       status: 'Track status',
-      concierge: 'Concierge access'
+      Empleado: 'Empleado access'
     },
     copyright: 'All rights reserved.'
   },
   booking: {
     title: 'Book your experience',
     description:
-      'Fill in the details to connect with a certified concierge who will confirm availability and coordinate logistics.',
+      'Fill in the details to connect with a certified Empleado who will confirm availability and coordinate logistics.',
     selectLabel: 'Select an experience',
     selectPlaceholder: 'Choose an experience',
     datetimeLabel: 'Preferred date & time',
@@ -166,7 +166,7 @@ const translation = {
     },
     availabilityTitle: 'Suggested availability',
     availabilityEmpty: 'Select an experience to view recommended times.',
-    availabilityNone: 'Coordinate with your concierge for custom availability.',
+    availabilityNone: 'Coordinate with your Empleado for custom availability.',
     estimatedTotal: 'Estimated total',
     priceHint: 'Base price per guest × party size. Confirmed when paid.'
   },
@@ -197,7 +197,7 @@ const translation = {
     title: 'Experience and services collection',
     description:
       'Explore configurable options for events, wellness, and private experiences. Book in minutes.',
-    curatedTag: 'Curated',
+    curatedTag: 'Featured',
     badges: ['Adventure', 'Nature', 'Wellness'],
     bookNow: 'Book now',
     loading: 'Loading tropical experiences…',
@@ -232,14 +232,14 @@ const translation = {
     ratingValue: '{{avg}} / 5 ({{count}} reviews)',
     noReviews: 'No reviews yet',
     availabilityTitle: 'Published availability',
-    availabilityEmpty: 'Ask concierge for special dates.',
+    availabilityEmpty: 'Ask Empleado for special dates.',
     reviewsTitle: 'Traveler reviews',
     noReviewsYet: 'Be the first to try this experience.',
     reviewScore: '{{score}} / 5'
   },
   statusPage: {
     title: 'Track your reservation',
-    description: 'Enter your code to view updates and meet your concierge team.',
+    description: 'Enter your code to view updates and meet your Empleado team.',
     placeholder: 'Confirmation code',
     search: 'Search',
     loading: 'Searching…',
@@ -251,7 +251,7 @@ const translation = {
     labels: {
       status: 'Status',
       scheduled: 'Scheduled for',
-      concierge: 'Assigned concierge',
+      Empleado: 'Assigned Empleado',
       reference: 'Reference code',
       guest: 'Lead traveler',
       partySize: 'Group size',
@@ -301,7 +301,7 @@ const translation = {
   },
   myReservations: {
     title: 'My reservations',
-    description: 'Review and track the concierge experiences you have started with us.',
+    description: 'Review and track the Empleado experiences you have started with us.',
     loading: 'Loading your reservations…',
     error: 'We could not load your reservations right now.',
     emptyTitle: 'No reservations yet',

@@ -1,7 +1,8 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { usePathname, useRouter } from 'expo-router';
-import React, { PropsWithChildren, useEffect, useMemo, useState } from 'react';
+import React, { PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
 import { useSupabase } from '../providers/SupabaseProvider';
@@ -16,31 +17,53 @@ export function MainLayout({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileInitials, setProfileInitials] = useState<string>('RP');
   const isDesktopWeb = Platform.OS === 'web' && width >= 1024;
 
   const { session, client } = useSupabase();
 
   const navItems = (t('navigation.items', { returnObjects: true }) || []) as NavItem[];
 
-  useEffect(() => {
-    const fetchDisplayName = async () => {
-      if (!session?.user?.id) {
-        setProfileDisplayName(null);
-        return;
-      }
-      const { data } = await client
-        .from('profiles')
-        .select('full_name, metadata')
-        .eq('id', session.user.id)
-        .maybeSingle();
+  const loadProfileHeader = useCallback(async () => {
+    if (!session?.user?.id) {
+      setProfileDisplayName(null);
+      setProfileAvatarUrl(null);
+      setProfileInitials('RP');
+      return;
+    }
+    const { data } = await client
+      .from('profiles')
+      .select('full_name, metadata')
+      .eq('id', session.user.id)
+      .maybeSingle();
 
-      const metadata = (data?.metadata as Record<string, unknown> | null) ?? {};
-      const username = typeof metadata.username === 'string' ? metadata.username.trim() : '';
-      const fullName = typeof data?.full_name === 'string' ? data.full_name.trim() : '';
-      setProfileDisplayName(username || fullName || null);
-    };
-    void fetchDisplayName();
+    const metadata = (data?.metadata as Record<string, unknown> | null) ?? {};
+    const username = typeof metadata.username === 'string' ? metadata.username.trim() : '';
+    const fullName = typeof data?.full_name === 'string' ? data.full_name.trim() : '';
+    const avatar = typeof metadata.avatar_url === 'string' ? metadata.avatar_url.trim() : '';
+    setProfileDisplayName(username || fullName || null);
+    setProfileAvatarUrl(avatar || null);
+
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    let initials = 'RP';
+    if (parts.length >= 2) initials = `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    else if (parts.length === 1 && parts[0].length >= 2) initials = parts[0].slice(0, 2).toUpperCase();
+    else if (parts.length === 1) initials = `${parts[0][0]}?`.toUpperCase();
+    else if (username.length >= 2) initials = username.slice(0, 2).toUpperCase();
+    else if (username.length === 1) initials = `${username[0]}?`.toUpperCase();
+    setProfileInitials(initials);
   }, [client, session?.user?.id]);
+
+  useEffect(() => {
+    void loadProfileHeader();
+  }, [loadProfileHeader]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadProfileHeader();
+    }, [loadProfileHeader]),
+  );
 
   const authPillLabel = useMemo(() => {
     if (!session) return t('navigation.signIn');
@@ -109,6 +132,13 @@ export function MainLayout({ children }: PropsWithChildren) {
             {isDesktopWeb ? (
               session ? (
                 <Pressable style={styles.signInBtn} onPress={() => navigate('/auth')}>
+                  {profileAvatarUrl ? (
+                    <Image source={{ uri: profileAvatarUrl }} style={styles.headerAvatarImg} />
+                  ) : (
+                    <View style={styles.headerAvatarFallback}>
+                      <Text style={styles.headerAvatarInitials}>{profileInitials}</Text>
+                    </View>
+                  )}
                   <Text style={styles.signInText} numberOfLines={1}>
                     {authPillLabel}
                   </Text>
@@ -170,7 +200,7 @@ export function MainLayout({ children }: PropsWithChildren) {
               <Text style={styles.footerLink}>{t('footer.links.status')}</Text>
             </Pressable>
             <Pressable onPress={() => navigate('/contact')}>
-              <Text style={styles.footerLink}>{t('footer.links.concierge')}</Text>
+              <Text style={styles.footerLink}>{t('footer.links.Empleado')}</Text>
             </Pressable>
           </View>
           <Text style={styles.copy}>© {new Date().getFullYear()} ReservaPro. {t('footer.copyright')}</Text>
@@ -218,13 +248,29 @@ const styles = StyleSheet.create({
   langText: { color: Colors.white80, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
   langCaret: { color: Colors.white50, fontSize: 10 },
   signInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
     borderColor: Colors.white20,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    maxWidth: 280,
   },
-  signInText: { color: Colors.white80, fontSize: 14, fontWeight: '600' },
+  headerAvatarImg: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white10 },
+  headerAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(14,165,233,0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,211,252,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarInitials: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  signInText: { color: Colors.white80, fontSize: 14, fontWeight: '600', flexShrink: 1 },
   hamburger: {
     paddingHorizontal: 10,
     paddingVertical: 6,

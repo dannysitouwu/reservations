@@ -1,7 +1,19 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import MainLayout from '../src/components/MainLayout';
 import { Picker } from '../src/components/Picker';
 import { Colors } from '../src/constants/colors';
@@ -23,6 +35,18 @@ function formatLocalPhoneInput(value: string): string {
   return `${digits.slice(0, 4)}-${digits.slice(4)}`;
 }
 
+function initialsFromProfile(firstName: string, lastName: string, username: string): string {
+  const f = firstName.trim();
+  const l = lastName.trim();
+  if (f && l) return `${f[0]}${l[0]}`.toUpperCase();
+  if (f.length >= 2) return f.slice(0, 2).toUpperCase();
+  const u = username.trim();
+  if (u.length >= 2) return u.slice(0, 2).toUpperCase();
+  if (f) return `${f[0]}P`.toUpperCase();
+  if (u) return `${u[0]}?`.toUpperCase();
+  return 'RP';
+}
+
 function parseStoredPhone(value: string | null): { countryCode: string; local: string } {
   if (!value) return { countryCode: '+506', local: '' };
   const clean = value.trim();
@@ -35,7 +59,14 @@ function parseStoredPhone(value: string | null): { countryCode: string; local: s
 export default function AuthPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { width: winW } = useWindowDimensions();
   const { client, session } = useSupabase();
+  const layoutW =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? Math.min(window.innerWidth, winW)
+      : winW;
+  const isDesktopWeb = Platform.OS === 'web' && layoutW >= 768;
+  const formMaxWidth = isDesktopWeb ? (session ? 880 : 440) : undefined;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,6 +75,8 @@ export default function AuthPage() {
   const [phone, setPhone] = useState('');
   const [phoneCountryCode, setPhoneCountryCode] = useState('+506');
   const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,6 +103,7 @@ export default function AuthPage() {
       setPhone(parsedPhone.local);
       const metadata = (data.metadata as Record<string, unknown> | null) ?? {};
       setUsername(typeof metadata.username === 'string' ? metadata.username : '');
+      setAvatarUrl(typeof metadata.avatar_url === 'string' ? metadata.avatar_url : '');
     };
     void loadProfile();
   }, [client, session?.user?.id]);
@@ -119,14 +153,22 @@ export default function AuthPage() {
       } else if (data?.session) {
         const composedName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ').trim() || null;
         const normalizedPhone = phoneDigits ? `${phoneCountryCode} ${formatLocalPhoneInput(phone)}` : null;
+        const { data: prevRow } = await client
+          .from('profiles')
+          .select('metadata')
+          .eq('id', data.session.user.id)
+          .maybeSingle();
+        const prevMeta = (prevRow?.metadata as Record<string, unknown> | null) ?? {};
         await client
           .from('profiles')
           .update({
             full_name: composedName,
             phone: normalizedPhone,
             metadata: {
+              ...prevMeta,
               username: username.trim() || null,
               last_name: lastName.trim() || null,
+              avatar_url: avatarUrl.trim() || null,
             },
           })
           .eq('id', data.session.user.id);
@@ -157,6 +199,46 @@ export default function AuthPage() {
     await client.auth.signOut();
   };
 
+  const handlePickAvatar = async () => {
+    if (!session?.user?.id) return;
+    setError(null);
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setError('Necesitamos permiso para acceder a tu galería y subir la foto de perfil.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    setUploadingAvatar(true);
+    try {
+      const uri = asset.uri;
+      const isPng = asset.mimeType === 'image/png' || /\.png(\?|$)/i.test(uri);
+      const ext = isPng ? 'png' : 'jpg';
+      const contentType = isPng ? 'image/png' : 'image/jpeg';
+      const path = `${session.user.id}/${Date.now()}.${ext}`;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const { error: upErr } = await client.storage.from('avatars').upload(path, blob, {
+        upsert: true,
+        contentType,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = client.storage.from('avatars').getPublicUrl(path);
+      setAvatarUrl(pub.publicUrl);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo subir la foto. Intenta otra imagen.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!session?.user?.id) return;
     setSavingProfile(true);
@@ -172,14 +254,18 @@ export default function AuthPage() {
 
     const composedName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ').trim() || null;
     const normalizedPhone = phoneDigits ? `${phoneCountryCode} ${formatLocalPhoneInput(phone)}` : null;
+    const { data: prevRow } = await client.from('profiles').select('metadata').eq('id', session.user.id).maybeSingle();
+    const prevMeta = (prevRow?.metadata as Record<string, unknown> | null) ?? {};
     const { error: updateError } = await client
       .from('profiles')
       .update({
         full_name: composedName,
         phone: normalizedPhone,
         metadata: {
+          ...prevMeta,
           username: username.trim() || null,
           last_name: lastName.trim() || null,
+          avatar_url: avatarUrl.trim() || null,
         },
       })
       .eq('id', session.user.id);
@@ -195,63 +281,195 @@ export default function AuthPage() {
 
   return (
     <MainLayout>
-      <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
         <Text style={styles.title}>{t('auth.title')}</Text>
         <Text style={styles.desc}>{t('auth.description')}</Text>
 
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, formMaxWidth != null && { maxWidth: formMaxWidth, width: '100%', alignSelf: 'center' }]}>
           {session ? (
             <View style={styles.signedInContainer}>
-              <View style={styles.accountHeaderCard}>
-                <View style={styles.accountAvatar}>
-                  <Text style={styles.accountAvatarText}>
-                    {(username || firstName || 'RP').slice(0, 2).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.accountName}>{[firstName, lastName].filter(Boolean).join(' ') || username || 'Perfil'}</Text>
-                  <Text style={styles.signedInText}>{t('auth.signedAs', { email: session.user?.email })}</Text>
-                </View>
-              </View>
-
-              <View style={styles.profileGrid}>
-                <View style={styles.profileField}>
-                  <Text style={styles.label}>Nombre</Text>
-                  <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholderTextColor={Colors.white40} />
-                </View>
-                <View style={styles.profileField}>
-                  <Text style={styles.label}>Apellidos</Text>
-                  <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor={Colors.white40} />
-                </View>
-                <View style={styles.profileField}>
-                  <Text style={styles.label}>Teléfono</Text>
-                  <View style={styles.phoneRow}>
-                    <View style={styles.phoneCodeCol}>
-                      <Picker value={phoneCountryCode} onValueChange={setPhoneCountryCode} items={COUNTRY_CODES} />
+              {isDesktopWeb ? (
+                <View style={styles.desktopProfileRow}>
+                  <View style={styles.profileHeroCol}>
+                    <View style={[styles.accountAvatar, styles.accountAvatarDesktop]}>
+                      {avatarUrl.trim() ? (
+                        <Image source={{ uri: avatarUrl.trim() }} style={styles.accountAvatarImage} />
+                      ) : (
+                        <Text style={styles.accountAvatarTextDesktop}>
+                          {initialsFromProfile(firstName, lastName, username)}
+                        </Text>
+                      )}
                     </View>
-                    <View style={styles.phoneLocalCol}>
-                      <TextInput
-                        style={styles.input}
-                        value={phone}
-                        onChangeText={(v) => setPhone(formatLocalPhoneInput(v))}
-                        placeholder="1234-5678"
-                        placeholderTextColor={Colors.white40}
-                        keyboardType="phone-pad"
-                      />
+                    <Text style={styles.accountNameDesktop}>
+                      {[firstName, lastName].filter(Boolean).join(' ') || username || 'Perfil'}
+                    </Text>
+                    <Text style={styles.signedInTextDesktop}>{t('auth.signedAs', { email: session.user?.email })}</Text>
+                  </View>
+                  <View style={styles.profileFieldsCol}>
+                    <Text style={styles.sectionEyebrow}>Datos del perfil</Text>
+                    <View style={[styles.profileGrid, styles.profileGridDesktop]}>
+                      <View style={[styles.profileField, styles.profileFieldHalf]}>
+                        <Text style={styles.label}>Nombre</Text>
+                        <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholderTextColor={Colors.white40} />
+                      </View>
+                      <View style={[styles.profileField, styles.profileFieldHalf]}>
+                        <Text style={styles.label}>Apellidos</Text>
+                        <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor={Colors.white40} />
+                      </View>
+                      <View style={[styles.profileField, styles.profileFieldFull]}>
+                        <Text style={styles.label}>Teléfono</Text>
+                        <View style={styles.phoneRow}>
+                          <View style={styles.phoneCodeCol}>
+                            <Picker value={phoneCountryCode} onValueChange={setPhoneCountryCode} items={COUNTRY_CODES} />
+                          </View>
+                          <View style={styles.phoneLocalCol}>
+                            <TextInput
+                              style={styles.input}
+                              value={phone}
+                              onChangeText={(v) => setPhone(formatLocalPhoneInput(v))}
+                              placeholder="1234-5678"
+                              placeholderTextColor={Colors.white40}
+                              keyboardType="phone-pad"
+                            />
+                          </View>
+                        </View>
+                      </View>
+                      <View style={[styles.profileField, styles.profileFieldHalf]}>
+                        <Text style={styles.label}>Username</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={username}
+                          onChangeText={setUsername}
+                          placeholderTextColor={Colors.white40}
+                          autoCapitalize="none"
+                        />
+                      </View>
+                      <View style={[styles.profileField, styles.profileFieldFull]}>
+                        <Text style={styles.photoHint}>Elige una imagen de perfil (Opcional)</Text>
+                        <View style={styles.photoActions}>
+                          <Pressable
+                            style={[styles.btnPhoto, (uploadingAvatar || savingProfile) && styles.btnDisabled]}
+                            onPress={() => void handlePickAvatar()}
+                            disabled={uploadingAvatar || savingProfile}
+                          >
+                            {uploadingAvatar ? (
+                              <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                              <Text style={styles.btnPhotoText}>{avatarUrl.trim() ? 'Cambiar foto' : 'Subir foto'}</Text>
+                            )}
+                          </Pressable>
+                          {avatarUrl.trim() ? (
+                            <Pressable
+                              style={styles.btnPhotoGhost}
+                              onPress={() => setAvatarUrl('')}
+                              disabled={uploadingAvatar || savingProfile}
+                            >
+                              <Text style={styles.btnPhotoGhostText}>Quitar</Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.desktopActions}>
+                      <Pressable
+                        style={[styles.btnPrimary, styles.btnPrimaryDesktop, savingProfile && styles.btnDisabled]}
+                        onPress={handleSaveProfile}
+                        disabled={savingProfile}
+                      >
+                        {savingProfile ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.btnPrimaryText}>Guardar perfil</Text>
+                        )}
+                      </Pressable>
+                      <Pressable style={styles.btnSignOutLink} onPress={handleSignOut}>
+                        <Text style={styles.btnSignOutLinkText}>{t('auth.signOut')}</Text>
+                      </Pressable>
                     </View>
                   </View>
                 </View>
-                <View style={styles.profileField}>
-                  <Text style={styles.label}>Username</Text>
-                  <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor={Colors.white40} autoCapitalize="none" />
-                </View>
-              </View>
-              <Pressable style={[styles.btnPrimary, savingProfile && styles.btnDisabled]} onPress={handleSaveProfile} disabled={savingProfile}>
-                {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnPrimaryText}>Guardar perfil</Text>}
-              </Pressable>
-              <Pressable style={styles.btnGhost} onPress={handleSignOut}>
-                <Text style={styles.btnGhostText}>{t('auth.signOut')}</Text>
-              </Pressable>
+              ) : (
+                <>
+                  <View style={styles.accountHeaderCard}>
+                    <View style={styles.accountAvatar}>
+                      {avatarUrl.trim() ? (
+                        <Image source={{ uri: avatarUrl.trim() }} style={styles.accountAvatarImage} />
+                      ) : (
+                        <Text style={styles.accountAvatarText}>{initialsFromProfile(firstName, lastName, username)}</Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.accountName}>{[firstName, lastName].filter(Boolean).join(' ') || username || 'Perfil'}</Text>
+                      <Text style={styles.signedInText}>{t('auth.signedAs', { email: session.user?.email })}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.profileGrid}>
+                    <View style={styles.profileField}>
+                      <Text style={styles.label}>Nombre</Text>
+                      <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholderTextColor={Colors.white40} />
+                    </View>
+                    <View style={styles.profileField}>
+                      <Text style={styles.label}>Apellidos</Text>
+                      <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor={Colors.white40} />
+                    </View>
+                    <View style={styles.profileField}>
+                      <Text style={styles.label}>Teléfono</Text>
+                      <View style={styles.phoneRow}>
+                        <View style={styles.phoneCodeCol}>
+                          <Picker value={phoneCountryCode} onValueChange={setPhoneCountryCode} items={COUNTRY_CODES} />
+                        </View>
+                        <View style={styles.phoneLocalCol}>
+                          <TextInput
+                            style={styles.input}
+                            value={phone}
+                            onChangeText={(v) => setPhone(formatLocalPhoneInput(v))}
+                            placeholder="1234-5678"
+                            placeholderTextColor={Colors.white40}
+                            keyboardType="phone-pad"
+                          />
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.profileField}>
+                      <Text style={styles.label}>Username</Text>
+                      <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor={Colors.white40} autoCapitalize="none" />
+                    </View>
+                    <View style={styles.profileField}>
+                      <Text style={styles.label}>Foto de perfil</Text>
+                      <Text style={styles.photoHint}>Elige una imagen de perfil</Text>
+                      <View style={styles.photoActions}>
+                        <Pressable
+                          style={[styles.btnPhoto, (uploadingAvatar || savingProfile) && styles.btnDisabled]}
+                          onPress={() => void handlePickAvatar()}
+                          disabled={uploadingAvatar || savingProfile}
+                        >
+                          {uploadingAvatar ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.btnPhotoText}>{avatarUrl.trim() ? 'Cambiar foto' : 'Subir foto'}</Text>
+                          )}
+                        </Pressable>
+                        {avatarUrl.trim() ? (
+                          <Pressable
+                            style={styles.btnPhotoGhost}
+                            onPress={() => setAvatarUrl('')}
+                            disabled={uploadingAvatar || savingProfile}
+                          >
+                            <Text style={styles.btnPhotoGhostText}>Quitar</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                  <Pressable style={[styles.btnPrimary, savingProfile && styles.btnDisabled]} onPress={handleSaveProfile} disabled={savingProfile}>
+                    {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnPrimaryText}>Guardar perfil</Text>}
+                  </Pressable>
+                  <Pressable style={styles.btnGhost} onPress={handleSignOut}>
+                    <Text style={styles.btnGhostText}>{t('auth.signOut')}</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           ) : (
             <View style={styles.form}>
@@ -347,12 +565,13 @@ export default function AuthPage() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {message ? <Text style={styles.success}>{message}</Text> : null}
         </View>
-      </View>
+      </ScrollView>
     </MainLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1 },
   container: { paddingHorizontal: 20, paddingVertical: 32 },
   title: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   desc: { color: Colors.white70, fontSize: 15, textAlign: 'center', marginBottom: 24 },
@@ -383,7 +602,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(125,211,252,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  accountAvatarImage: { width: '100%', height: '100%' },
   accountAvatarText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   accountName: { color: '#fff', fontSize: 17, fontWeight: '700' },
   signedInText: { color: Colors.white70, fontSize: 14 },
@@ -414,6 +635,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
   },
+  btnGhostSecondary: {
+    maxWidth: 220,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+  },
   btnGhostText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   toggleRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' },
   toggleText: { color: Colors.white70, fontSize: 14 },
@@ -421,8 +648,76 @@ const styles = StyleSheet.create({
   error: { color: Colors.rose300, fontSize: 13, marginTop: 12 },
   success: { color: Colors.emerald300, fontSize: 13, marginTop: 12 },
   profileGrid: { gap: 12 },
+  profileGridDesktop: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 12 },
   profileField: { gap: 6 },
+  profileFieldHalf: { flex: 1, minWidth: 200, maxWidth: '48%' as const },
+  profileFieldFull: { width: '100%' as const, flexBasis: '100%' },
+  photoHint: { color: Colors.white50, fontSize: 13, lineHeight: 18 },
+  photoActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  btnPhoto: {
+    backgroundColor: 'rgba(14,165,233,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,211,252,0.5)',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    minWidth: 140,
+    alignItems: 'center',
+  },
+  btnPhotoText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  btnPhotoGhost: {
+    borderWidth: 1,
+    borderColor: Colors.white20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    justifyContent: 'center',
+  },
+  btnPhotoGhostText: { color: Colors.white70, fontWeight: '600', fontSize: 14 },
   phoneRow: { flexDirection: 'row', gap: 10 },
   phoneCodeCol: { flex: 1 },
   phoneLocalCol: { flex: 1.2 },
+  desktopProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 28,
+    width: '100%',
+  },
+  profileHeroCol: {
+    width: 200,
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  accountAvatarDesktop: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  accountAvatarTextDesktop: { color: '#fff', fontSize: 32, fontWeight: '800' },
+  accountNameDesktop: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  signedInTextDesktop: {
+    color: Colors.white60,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  profileFieldsCol: { flex: 1, minWidth: 0, gap: 16 },
+  sectionEyebrow: {
+    color: Colors.white50,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  desktopActions: { gap: 14, marginTop: 4 },
+  btnPrimaryDesktop: { paddingVertical: 16, borderRadius: 14 },
+  btnSignOutLink: { alignSelf: 'flex-start', paddingVertical: 4 },
+  btnSignOutLinkText: { color: Colors.white60, fontSize: 14, fontWeight: '600' },
 });

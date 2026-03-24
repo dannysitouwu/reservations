@@ -115,7 +115,7 @@ export function ReservationsPage() {
                 <TableHead>Cliente</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Programado</TableHead>
-                <TableHead>Concierge</TableHead>
+                <TableHead>Empleado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
